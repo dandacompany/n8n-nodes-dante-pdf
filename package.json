@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-dante-pdf",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "n8n custom node for PDF conversion with support for Markdown, Text, DOCX, HTML, Image to PDF and PDF merging",
   "keywords": [
     "n8n-custom-node",
@@ -13,14 +13,17 @@
     "merge"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/dante-pdf/n8n-nodes-dante-pdf",
+  "homepage": "https://github.com/dandacompany/n8n-nodes-dante-pdf",
   "author": {
     "name": "Dante PDF",
-    "email": "contact@dantepdf.com"
+    "email": "datapod.k@gmail.com"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dante-pdf/n8n-nodes-dante-pdf.git"
+    "url": "git+https://github.com/dandacompany/n8n-nodes-dante-pdf.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dandacompany/n8n-nodes-dante-pdf/issues"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
