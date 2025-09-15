@@ -253,7 +253,10 @@ export class SystemDependencyInstaller {
       'gtk+3.0',           // GTK (for some dependencies)
       'nss',               // Network Security Services
       'freetype',          // Font rendering
-      'harfbuzz'           // Text shaping
+      'harfbuzz',          // Text shaping
+      'alsa-lib',          // ALSA sound library (required even in headless mode)
+      'alsa-lib-dev',      // ALSA development files
+      'pulseaudio-libs'    // PulseAudio libraries (fallback for audio)
     ];
 
     // Additional packages for musl environments

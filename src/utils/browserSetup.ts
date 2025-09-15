@@ -213,7 +213,7 @@ export class BrowserSetup {
       launchOptions.args.push(...baseArgs);
 
       if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
-        // Alpine/musl optimizations
+        // Alpine/musl optimizations with complete audio/video disable
         launchOptions.args.push(
           '--no-zygote',
           '--single-process',
@@ -240,7 +240,33 @@ export class BrowserSetup {
           '--enable-tcp-fast-open',
           '--media-cache-size=33554432',
           '--aggressive-cache-discard',
-          '--use-simple-cache-backend=on'
+          '--use-simple-cache-backend=on',
+          // Complete audio subsystem disable
+          '--disable-features=AudioServiceSandbox',
+          '--disable-audio-output',
+          '--disable-audio-input',
+          '--mute-audio',
+          '--no-audio',
+          '--disable-features=AudioServiceOutOfProcess,AudioServiceSandbox',
+          '--disable-web-audio',
+          '--disable-speech-synthesis',
+          '--disable-speech-dispatcher',
+          // Additional Alpine/Docker compatibility
+          '--disable-features=UseOzonePlatform',
+          '--disable-blink-features=AutomationControlled',
+          '--disable-features=IsolateOrigins,site-per-process',
+          '--disable-site-isolation-trials',
+          '--disable-features=BlockInsecurePrivateNetworkRequests',
+          '--disable-features=OutOfBlinkCors',
+          // Force software rendering
+          '--use-gl=swiftshader',
+          '--disable-gpu-sandbox',
+          '--disable-software-rasterizer',
+          '--disable-features=VizDisplayCompositor,VizHitTestSurfaceLayer',
+          // Permissions
+          '--no-first-run',
+          '--no-default-browser-check',
+          '--disable-features=RendererCodeIntegrity'
         );
       } else {
         // Regular Linux optimizations
