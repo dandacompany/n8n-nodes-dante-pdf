@@ -241,22 +241,38 @@ export class SystemDependencyInstaller {
   private static async installAlpineDependencies(systemInfo: SystemInfo): Promise<InstallResult> {
     this.logger.info('Installing Alpine Linux dependencies...');
     
+    // Core packages for Alpine - Install Chromium FIRST
     const packages = [
-      'gcompat',           // glibc compatibility
-      'libstdc++',         // C++ standard library
-      'chromium',          // System Chromium (fallback)
-      'ttf-liberation',    // Fonts
-      'fontconfig',        // Font configuration
-      'cairo',             // Graphics library
-      'pango',             // Text rendering
-      'gdk-pixbuf',        // Image loading
-      'gtk+3.0',           // GTK (for some dependencies)
-      'nss',               // Network Security Services
-      'freetype',          // Font rendering
-      'harfbuzz',          // Text shaping
-      'alsa-lib',          // ALSA sound library (required even in headless mode)
-      'alsa-lib-dev',      // ALSA development files
-      'pulseaudio-libs'    // PulseAudio libraries (fallback for audio)
+      'chromium',              // System Chromium - MUST be first
+      'chromium-chromedriver', // Chromium driver for automation
+      'gcompat',               // glibc compatibility 
+      'libstdc++',             // C++ standard library
+      'ttf-liberation',        // Fonts
+      'fontconfig',            // Font configuration
+      'cairo',                 // Graphics library
+      'pango',                 // Text rendering
+      'gdk-pixbuf',            // Image loading
+      'gtk+3.0',               // GTK (for some dependencies)
+      'nss',                   // Network Security Services
+      'freetype',              // Font rendering
+      'harfbuzz',              // Text shaping
+      'alsa-lib',              // ALSA sound library (required even in headless mode)
+      'alsa-lib-dev',          // ALSA development files
+      'pulseaudio-libs',       // PulseAudio libraries (fallback for audio)
+      'libx11',                // X11 library
+      'libxcomposite',         // X11 Composite extension
+      'libxdamage',            // X11 Damage extension
+      'libxext',               // X11 miscellaneous extensions
+      'libxfixes',             // X11 Fixes extension
+      'libxrandr',             // X11 RandR extension
+      'libxcb',                // X protocol C-language Binding
+      'libxkbcommon',          // Keyboard handling
+      'cups-libs',             // CUPS printing system
+      'dbus-libs',             // D-Bus library
+      'atk',                   // Accessibility toolkit
+      'at-spi2-atk',           // AT-SPI2 ATK bridge
+      'eudev-libs',            // udev library
+      'mesa-gbm'               // GBM library
     ];
 
     // Additional packages for musl environments

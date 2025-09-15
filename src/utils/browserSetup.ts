@@ -44,6 +44,13 @@ export class BrowserSetup {
     }
 
     const systemInfo = await SystemDependencyInstaller.detectSystem();
+    
+    // For Alpine Linux, ALWAYS prefer system Chromium over Playwright
+    if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
+      this.logger.info('Alpine/musl detected, prioritizing system Chromium...');
+      options.useSystemChrome = true;
+    }
+    
     this.browserPath = await this.findOptimalBrowserPath(systemInfo, options);
 
     return this.browserPath;
@@ -69,11 +76,13 @@ export class BrowserSetup {
         '/Applications/Chromium.app/Contents/MacOS/Chromium'
       );
     } else if (systemInfo.platform === 'linux') {
-      // Linux paths
-      if (systemInfo.distro === 'alpine') {
+      // Linux paths - Alpine paths FIRST for Alpine systems
+      if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
+        // Alpine-specific paths prioritized
         candidatePaths.push(
-          '/usr/bin/chromium-browser',
+          '/usr/bin/chromium-browser',  // Most common Alpine Chromium path
           '/usr/bin/chromium',
+          '/usr/lib/chromium/chromium',  // Alternative Alpine location
           '/usr/bin/google-chrome-stable',
           '/usr/bin/google-chrome'
         );
@@ -89,25 +98,32 @@ export class BrowserSetup {
       }
     }
 
-    // Check system browsers first if requested
-    if (options.useSystemChrome) {
+    // Check system browsers first if requested or on Alpine
+    if (options.useSystemChrome || systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
       for (const browserPath of candidatePaths) {
         if (fs.existsSync(browserPath)) {
           this.logger.success(`Found system browser: ${browserPath}`);
           return browserPath;
         }
       }
+      
+      // For Alpine, log helpful message if no system Chromium found
+      if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
+        this.logger.warn('System Chromium not found in Alpine. Please install with: apk add chromium');
+      }
     }
 
-    // Fallback to Playwright's bundled browser
-    try {
-      const playwrightPath = chromium.executablePath();
-      if (playwrightPath && fs.existsSync(playwrightPath)) {
-        this.logger.success(`Using Playwright browser: ${playwrightPath}`);
-        return playwrightPath;
+    // Fallback to Playwright's bundled browser (but avoid on Alpine/musl)
+    if (systemInfo.distro !== 'alpine' && systemInfo.libc !== 'musl') {
+      try {
+        const playwrightPath = chromium.executablePath();
+        if (playwrightPath && fs.existsSync(playwrightPath)) {
+          this.logger.success(`Using Playwright browser: ${playwrightPath}`);
+          return playwrightPath;
+        }
+      } catch (error) {
+        this.logger.warn(`Playwright browser not found: ${(error as Error).message}`);
       }
-    } catch (error) {
-      this.logger.warn(`Playwright browser not found: ${(error as Error).message}`);
     }
 
     // Try system browsers as final fallback
@@ -116,6 +132,11 @@ export class BrowserSetup {
         this.logger.success(`Fallback to system browser: ${browserPath}`);
         return browserPath;
       }
+    }
+
+    // Alpine-specific error message
+    if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
+      throw new Error('No Chromium found in Alpine Linux. Please install with: apk add chromium chromium-chromedriver');
     }
 
     throw new Error('No suitable browser found. Please install Chrome, Chromium, or run: npx playwright-core install chromium');
