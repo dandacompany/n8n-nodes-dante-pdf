@@ -58,7 +58,7 @@ export abstract class BaseConverter<TOptions = any> {
 
       if (this.supportedFormats.length > 0) {
         const hasValidFormat = this.supportedFormats.some(format => {
-          const fileName = input.file!.fileName.toLowerCase();
+          const fileName = (input.file!.fileName || '').toLowerCase();
           return fileName.endsWith(format.toLowerCase());
         });
 
@@ -81,7 +81,7 @@ export abstract class BaseConverter<TOptions = any> {
       if (this.supportedFormats.length > 0) {
         input.files.forEach((file, index) => {
           const hasValidFormat = this.supportedFormats.some(format => {
-            const fileName = file.fileName.toLowerCase();
+            const fileName = (file.fileName || '').toLowerCase();
             return fileName.endsWith(format.toLowerCase());
           });
 

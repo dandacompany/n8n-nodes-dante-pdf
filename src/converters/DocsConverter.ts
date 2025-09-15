@@ -1,20 +1,27 @@
-import PDFDocument from 'pdfkit';
 import mammoth from 'mammoth';
-import { parse } from 'node-html-parser';
 import { BaseConverter } from './BaseConverter';
 import { ConversionInput, DocsOptions } from '../types';
 import { createError } from '../utils/errors';
+import { BrowserSetup } from '../utils/browserSetup';
+import { Browser, Page } from 'playwright-core';
 
 export class DocsConverter extends BaseConverter<DocsOptions> {
+  private browser: Browser | null = null;
+
   constructor() {
     super('DocsConverter', 25 * 1024 * 1024, ['.docx', '.doc']);
   }
 
   override async initialize(): Promise<void> {
-    this.logger.info('DocsConverter initialized (PDFKit-based)');
+    this.logger.info('DocsConverter initialized (Playwright-based)');
+    // Browser will be initialized on first use
   }
 
   override async cleanup(): Promise<void> {
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = null;
+    }
     this.logger.info('DocsConverter cleanup completed');
   }
 
@@ -23,41 +30,64 @@ export class DocsConverter extends BaseConverter<DocsOptions> {
       throw createError.missingFile('DOCX file is required');
     }
 
+    let page: Page | null = null;
+
     try {
       const options = input.options || {};
+
+      // Launch browser if not already launched
+      if (!this.browser) {
+        const browserResult = await BrowserSetup.createOptimizedBrowser({
+          headless: true,
+          timeout: 30000,
+          useSystemChrome: true,
+        });
+        this.browser = browserResult.browser;
+      }
+
+      // Create a new page
+      page = await this.browser.newPage();
+
+      // Set viewport for proper rendering
+      await page.setViewportSize({
+        width: 794, // A4 width in pixels at 96 DPI
+        height: 1123, // A4 height in pixels at 96 DPI
+      });
 
       // Convert DOCX to HTML using mammoth
       const html = await this.docxToHtml(input.file.data, options);
 
-      // Parse HTML
-      const root = parse(html);
+      // Enhance HTML with Korean font support and proper styling
+      const enhancedHtml = this.enhanceHtmlWithStyling(html, options);
 
-      // Create PDF document
-      const doc = new PDFDocument({
-        size: options.format || 'A4',
-        layout: options.landscape ? 'landscape' : 'portrait',
-        margin: 72, // 1 inch margins
-        bufferPages: true,
+      // Set content and wait for fonts to load
+      await page.setContent(enhancedHtml, {
+        waitUntil: 'networkidle',
+        timeout: 30000,
       });
 
-      // Collect PDF chunks
-      const chunks: Buffer[] = [];
-      doc.on('data', chunk => chunks.push(chunk));
-
-      // Process HTML to PDF
-      this.processHtmlToPdf(doc, root);
-
-      // Finalize document
-      doc.end();
-
-      // Wait for stream to finish
-      return new Promise((resolve, reject) => {
-        doc.on('end', () => {
-          const pdfBuffer = Buffer.concat(chunks);
-          resolve(pdfBuffer);
-        });
-        doc.on('error', reject);
+      // Wait for fonts to load
+      await page.evaluate(() => {
+        return document.fonts.ready;
       });
+
+      // Additional wait for web fonts
+      await page.waitForTimeout(1000);
+
+      // Generate PDF with options
+      const pdfBuffer = await page.pdf({
+        format: options.format || 'A4',
+        landscape: options.landscape || false,
+        printBackground: true,
+        margin: {
+          top: '20mm',
+          bottom: '20mm',
+          left: '20mm',
+          right: '20mm',
+        },
+      });
+
+      return pdfBuffer;
     } catch (error) {
       this.logger.error('DOCX conversion failed:', error);
 
@@ -65,6 +95,11 @@ export class DocsConverter extends BaseConverter<DocsOptions> {
         throw createError.conversionFailed(error.message);
       }
       throw createError.conversionFailed('Failed to convert DOCX to PDF');
+    } finally {
+      // Close the page
+      if (page) {
+        await page.close();
+      }
     }
   }
 
@@ -113,243 +148,199 @@ export class DocsConverter extends BaseConverter<DocsOptions> {
     }
   }
 
-  private processHtmlToPdf(doc: any, root: any): void {
-    const elements = root.childNodes || [];
+  private enhanceHtmlWithStyling(html: string, options: DocsOptions): string {
+    // Check if HTML already has proper structure
+    const hasHtmlTag = /<html/i.test(html);
+    const hasHeadTag = /<head/i.test(html);
+    const hasBodyTag = /<body/i.test(html);
+    const hasCharset = /<meta[^>]*charset/i.test(html);
 
-    for (const element of elements) {
-      if (typeof element === 'string') {
-        continue;
+    // Korean font and styling CSS
+    const styleContent = `
+      <style>
+        /* Korean font support */
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&display=swap');
+        
+        /* Base styles */
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        
+        body {
+          font-family: 'Noto Sans KR', 'Malgun Gothic', '맑은 고딕', 'Apple SD Gothic Neo',
+                       'Helvetica Neue', Arial, sans-serif;
+          font-size: 11pt;
+          line-height: 1.6;
+          color: #333;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+          text-rendering: optimizeLegibility;
+          padding: 20px;
+        }
+        
+        /* Headings */
+        h1, h2, h3, h4, h5, h6 {
+          font-family: 'Noto Serif KR', 'Noto Sans KR', serif;
+          font-weight: 700;
+          margin-top: 1em;
+          margin-bottom: 0.5em;
+          line-height: 1.3;
+        }
+        
+        h1 { font-size: 24pt; color: #2c3e50; }
+        h2 { font-size: 20pt; color: #34495e; }
+        h3 { font-size: 16pt; color: #34495e; }
+        h4 { font-size: 14pt; color: #34495e; }
+        h5 { font-size: 12pt; color: #34495e; }
+        h6 { font-size: 11pt; color: #34495e; }
+        
+        /* Paragraphs */
+        p {
+          margin-bottom: 1em;
+          text-align: justify;
+        }
+        
+        /* Lists */
+        ul, ol {
+          margin-left: 30px;
+          margin-bottom: 1em;
+        }
+        
+        li {
+          margin-bottom: 0.3em;
+        }
+        
+        /* Blockquotes */
+        blockquote {
+          border-left: 4px solid #ddd;
+          padding-left: 20px;
+          margin: 1em 0;
+          font-style: italic;
+          color: #666;
+        }
+        
+        /* Code blocks */
+        pre {
+          background-color: #f5f5f5;
+          padding: 15px;
+          border-radius: 4px;
+          overflow-x: auto;
+          margin-bottom: 1em;
+          font-family: 'D2Coding', Consolas, Monaco, monospace;
+        }
+        
+        code {
+          background-color: #f5f5f5;
+          padding: 2px 4px;
+          border-radius: 2px;
+          font-family: 'D2Coding', Consolas, Monaco, monospace;
+          font-size: 0.9em;
+        }
+        
+        /* Tables */
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 1em;
+        }
+        
+        th, td {
+          border: 1px solid #ddd;
+          padding: 8px;
+          text-align: left;
+        }
+        
+        th {
+          background-color: #f5f5f5;
+          font-weight: bold;
+        }
+        
+        /* Images */
+        img {
+          max-width: 100%;
+          height: auto;
+          display: block;
+          margin: 1em auto;
+        }
+        
+        /* Links */
+        a {
+          color: #3498db;
+          text-decoration: none;
+        }
+        
+        a:hover {
+          text-decoration: underline;
+        }
+        
+        /* Strong and emphasis */
+        strong, b {
+          font-weight: 700;
+        }
+        
+        em, i {
+          font-style: italic;
+        }
+        
+        /* Horizontal rule */
+        hr {
+          border: none;
+          border-top: 1px solid #ddd;
+          margin: 2em 0;
+        }
+      </style>
+    `;
+
+    // Build complete HTML document
+    let enhancedHtml = html;
+
+    if (!hasHtmlTag) {
+      // Wrap content in proper HTML structure
+      enhancedHtml = `
+        <!DOCTYPE html>
+        <html lang="ko">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          ${styleContent}
+        </head>
+        <body>
+          ${html}
+        </body>
+        </html>
+      `;
+    } else {
+      // Add meta tags and styles to existing HTML
+      if (!hasCharset) {
+        enhancedHtml = enhancedHtml.replace(
+          /<head[^>]*>/i,
+          '$&\n<meta charset="UTF-8">'
+        );
       }
 
-      this.processElement(doc, element, 0);
+      // Add styles
+      if (hasHeadTag) {
+        enhancedHtml = enhancedHtml.replace(
+          /<\/head>/i,
+          `${styleContent}\n</head>`
+        );
+      } else {
+        enhancedHtml = enhancedHtml.replace(
+          /<html[^>]*>/i,
+          `$&\n<head>${styleContent}</head>`
+        );
+      }
+
+      // Set lang attribute if not present
+      enhancedHtml = enhancedHtml.replace(
+        /<html(?![^>]*lang)/i,
+        '<html lang="ko"'
+      );
     }
-  }
 
-  private processElement(doc: any, element: any, depth: number): void {
-    const tagName = element.tagName?.toLowerCase();
-    const text = this.extractText(element);
-
-    switch (tagName) {
-      case 'h1':
-        doc.fontSize(24).font('Helvetica-Bold').text(text, { align: 'left' });
-        doc.moveDown(0.5);
-        break;
-      case 'h2':
-        doc.fontSize(20).font('Helvetica-Bold').text(text, { align: 'left' });
-        doc.moveDown(0.5);
-        break;
-      case 'h3':
-        doc.fontSize(16).font('Helvetica-Bold').text(text, { align: 'left' });
-        doc.moveDown(0.5);
-        break;
-      case 'h4':
-        doc.fontSize(14).font('Helvetica-Bold').text(text, { align: 'left' });
-        doc.moveDown(0.5);
-        break;
-      case 'h5':
-      case 'h6':
-        doc.fontSize(12).font('Helvetica-Bold').text(text, { align: 'left' });
-        doc.moveDown(0.5);
-        break;
-      case 'p':
-        if (text) {
-          doc.fontSize(11).font('Helvetica').text(text, { align: 'justify' });
-          doc.moveDown(0.5);
-        }
-        break;
-      case 'ul':
-      case 'ol':
-        this.processList(doc, element, tagName === 'ol');
-        doc.moveDown(0.5);
-        break;
-      case 'li':
-        // Handled by processList
-        break;
-      case 'blockquote':
-        if (text) {
-          doc.fontSize(11).font('Helvetica-Oblique').text(text, {
-            align: 'left',
-            indent: 20,
-          });
-          doc.moveDown(0.5);
-        }
-        break;
-      case 'pre':
-        // Code block
-        if (text) {
-          doc
-            .fontSize(10)
-            .font('Courier')
-            .fillColor('#333333')
-            .text(text, {
-              align: 'left',
-              indent: 10,
-            })
-            .fillColor('#000000');
-          doc.moveDown(0.5);
-        }
-        break;
-      case 'code':
-        // Inline code - handled within text processing
-        break;
-      case 'hr':
-        doc.moveDown(0.5);
-        const y = doc.y;
-        doc
-          .moveTo(doc.page.margins.left, y)
-          .lineTo(doc.page.width - doc.page.margins.right, y)
-          .stroke();
-        doc.moveDown(0.5);
-        break;
-      case 'table':
-        this.processTable(doc, element);
-        doc.moveDown(0.5);
-        break;
-      case 'strong':
-      case 'b':
-        if (text) {
-          doc.font('Helvetica-Bold').text(text, { continued: true });
-          doc.font('Helvetica');
-        }
-        break;
-      case 'em':
-      case 'i':
-        if (text) {
-          doc.font('Helvetica-Oblique').text(text, { continued: true });
-          doc.font('Helvetica');
-        }
-        break;
-      case 'a':
-        const href = element.getAttribute('href');
-        if (text || href) {
-          doc
-            .fillColor('#0066cc')
-            .text(text || href || 'Link', {
-              continued: true,
-              underline: true,
-            })
-            .fillColor('#000000');
-        }
-        break;
-      case 'img':
-        // Handle embedded images from DOCX
-        const src = element.getAttribute('src');
-        if (src && src.startsWith('data:')) {
-          try {
-            // Extract base64 data
-            const matches = src.match(/^data:([^;]+);base64,(.+)$/);
-            if (matches) {
-              const imageData = Buffer.from(matches[2], 'base64');
-              // Add image to PDF (centered, with max width)
-              doc.image(imageData, {
-                fit: [400, 300],
-                align: 'center',
-              });
-              doc.moveDown(0.5);
-            }
-          } catch (err) {
-            // If image fails, add alt text
-            const alt = element.getAttribute('alt');
-            if (alt) {
-              doc
-                .fontSize(10)
-                .font('Helvetica-Oblique')
-                .text(`[Image: ${alt}]`, { align: 'center' });
-              doc.moveDown(0.5);
-            }
-          }
-        }
-        break;
-      case 'br':
-        doc.moveDown(0.3);
-        break;
-      default:
-        // For unknown tags or containers, process children
-        if (element.childNodes && element.childNodes.length > 0) {
-          for (const child of element.childNodes) {
-            if (typeof child !== 'string') {
-              this.processElement(doc, child, depth + 1);
-            } else if (child.trim()) {
-              // Process text nodes
-              doc.fontSize(11).font('Helvetica').text(child.trim());
-            }
-          }
-        } else if (text) {
-          // If no children but has text, output it
-          doc.fontSize(11).font('Helvetica').text(text);
-          doc.moveDown(0.3);
-        }
-        break;
-    }
-  }
-
-  private extractText(element: any): string {
-    // Extract only direct text content, not from children
-    if (element.childNodes) {
-      let text = '';
-      for (const child of element.childNodes) {
-        if (typeof child === 'string') {
-          text += child;
-        } else if (
-          child.tagName?.toLowerCase() === 'strong' ||
-          child.tagName?.toLowerCase() === 'b'
-        ) {
-          text += child.text || '';
-        } else if (child.tagName?.toLowerCase() === 'em' || child.tagName?.toLowerCase() === 'i') {
-          text += child.text || '';
-        } else if (child.tagName?.toLowerCase() === 'code') {
-          text += child.text || '';
-        }
-      }
-      return text.trim();
-    }
-    return element.text?.trim() || '';
-  }
-
-  private processList(doc: any, listElement: any, isOrdered: boolean): void {
-    const items = listElement.querySelectorAll('li') || [];
-
-    items.forEach((item: any, index: number) => {
-      const bullet = isOrdered ? `${index + 1}. ` : '• ';
-      const text = this.extractText(item);
-
-      if (text) {
-        doc
-          .fontSize(11)
-          .font('Helvetica')
-          .text(bullet, {
-            continued: true,
-            indent: 20,
-          })
-          .text(text);
-        doc.moveDown(0.3);
-      }
-    });
-  }
-
-  private processTable(doc: any, tableElement: any): void {
-    const rows = tableElement.querySelectorAll('tr') || [];
-
-    rows.forEach((row: any) => {
-      const cells = row.querySelectorAll('td, th') || [];
-      const cellTexts: string[] = [];
-
-      cells.forEach((cell: any) => {
-        const text = this.extractText(cell);
-        cellTexts.push(text);
-      });
-
-      if (cellTexts.length > 0) {
-        const isHeader = row.querySelector('th') !== null;
-        if (isHeader) {
-          doc.font('Helvetica-Bold');
-        } else {
-          doc.font('Helvetica');
-        }
-
-        doc.fontSize(10).text(cellTexts.join(' | '), { align: 'left' });
-        doc.moveDown(0.2);
-      }
-    });
+    return enhancedHtml;
   }
 }
