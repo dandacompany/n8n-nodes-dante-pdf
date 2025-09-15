@@ -2,76 +2,58 @@
   "name": "Convert to PDF Example1",
   "nodes": [
     {
-      "parameters": {},
-      "type": "n8n-nodes-base.manualTrigger",
-      "typeVersion": 1,
-      "position": [
-        -336,
-        0
-      ],
-      "id": "45b21b96-b54a-4647-86ba-1e89e9787557",
-      "name": "When clicking ‘Execute workflow’"
-    },
-    {
       "parameters": {
-        "conversionType": "htmlToPdf",
-        "inputSource": "binaryData",
+        "content": "={{ $json.data }}",
         "additionalOptions": {},
-        "htmlOptions": {}
+        "markdownOptions": {}
       },
       "type": "n8n-nodes-dante-pdf.dantePdf",
       "typeVersion": 1,
       "position": [
-        336,
-        0
+        416,
+        -80
       ],
-      "id": "92108723-2d8b-4834-b486-7d39bd1a95a6",
+      "id": "d211d954-398f-4530-8c95-bc57c89b8e46",
       "name": "Dante PDF"
     },
     {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        16,
+        -80
+      ],
+      "id": "426d2af2-5d66-4dd0-b62b-2b32364b5151",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
       "parameters": {
-        "url": "https://n.news.naver.com/article/newspaper/020/0003661036?date=20250915",
+        "url": "https://raw.githubusercontent.com/dandacompany/n8n-nodes-dante-pdf/refs/heads/master/README.md",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -128,
-        0
+        224,
+        -80
       ],
-      "id": "71d4f1e2-6b94-4058-bc4f-8b97c4edda9d",
+      "id": "a58616eb-8b61-44d5-9e4d-3154fa129e29",
       "name": "HTTP Request"
     },
     {
       "parameters": {
-        "operation": "toText",
-        "sourceProperty": "data",
-        "options": {
-          "fileName": "test.html"
-        }
-      },
-      "type": "n8n-nodes-base.convertToFile",
-      "typeVersion": 1.1,
-      "position": [
-        80,
-        0
-      ],
-      "id": "9895722d-9bf4-4ac8-873c-d14960930a9b",
-      "name": "Convert to File"
-    },
-    {
-      "parameters": {
-        "html": "={{ $json.data }}",
+        "url": "https://dante-datalab.com",
         "options": {}
       },
-      "type": "n8n-nodes-base.markdown",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
-        80,
-        192
+        224,
+        80
       ],
-      "id": "aae31cd5-7e11-41bd-a327-37392cfa1d5e",
-      "name": "Markdown"
+      "id": "b3abd117-2f80-4cbe-af79-0c379a21fe06",
+      "name": "HTTP Request1"
     },
     {
       "parameters": {
@@ -83,11 +65,77 @@
       "type": "n8n-nodes-dante-pdf.dantePdf",
       "typeVersion": 1,
       "position": [
-        336,
-        192
+        416,
+        80
       ],
-      "id": "2cc77ca5-447e-4cb0-9955-670ba024935b",
+      "id": "10b99d12-cf89-4ec9-8955-8848e3fdd6c6",
       "name": "Dante PDF1"
+    },
+    {
+      "parameters": {
+        "url": "https://github.com/felixlimanta/sample-docx-repo/raw/refs/heads/master/doc/lorem_ipsum.docx",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        272
+      ],
+      "id": "e964b6ca-9c06-4b88-88a0-ccc91ca9ca88",
+      "name": "HTTP Request2"
+    },
+    {
+      "parameters": {
+        "conversionType": "docxToPdf",
+        "inputSource": "binaryData",
+        "additionalOptions": {},
+        "docsOptions": {}
+      },
+      "type": "n8n-nodes-dante-pdf.dantePdf",
+      "typeVersion": 1,
+      "position": [
+        416,
+        272
+      ],
+      "id": "e8e54c45-ae61-436f-a073-b73be13365b0",
+      "name": "Dante PDF2"
+    },
+    {
+      "parameters": {
+        "url": "https://www.republicrecords.com/cdn/shop/files/REPU-00092_KPOP_DemonHunters_CollectionPage-Banner-02Mobile.png?v=1751556728&width=900",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        448
+      ],
+      "id": "5875bd31-78ef-4fc4-bec0-d25c98858f96",
+      "name": "HTTP Request3"
+    },
+    {
+      "parameters": {
+        "conversionType": "imageToPdf",
+        "inputSource": "binaryData",
+        "additionalOptions": {},
+        "imageOptions": {}
+      },
+      "type": "n8n-nodes-dante-pdf.dantePdf",
+      "typeVersion": 1,
+      "position": [
+        416,
+        448
+      ],
+      "id": "e37605f7-90a3-45a2-9fe7-491c874647b4",
+      "name": "Dante PDF3"
     }
   ],
   "pinData": {},
@@ -99,27 +147,26 @@
             "node": "HTTP Request",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request3",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
     },
     "HTTP Request": {
-      "main": [
-        [
-          {
-            "node": "Convert to File",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Markdown",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Convert to File": {
       "main": [
         [
           {
@@ -130,11 +177,33 @@
         ]
       ]
     },
-    "Markdown": {
+    "HTTP Request1": {
       "main": [
         [
           {
             "node": "Dante PDF1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "Dante PDF2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request3": {
+      "main": [
+        [
+          {
+            "node": "Dante PDF3",
             "type": "main",
             "index": 0
           }
@@ -146,10 +215,10 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "e301297e-b63e-480e-bb48-b13fc10d818c",
+  "versionId": "117db91d-e950-4b39-a4d3-906e7bf0868e",
   "meta": {
-    "instanceId": "ae59e3c4dbc3b4aab3d81fc78280645903de4834ef0fa1a8e01178181c7a57a4"
+    "instanceId": "ccf75c1528ec79e0575a36a666a74245bc7df6d6f11a177adedc1c581cba686f"
   },
-  "id": "VfR4UAQCouTNQ1NO",
+  "id": "rVAqASMRYDOTX4VM",
   "tags": []
 }
