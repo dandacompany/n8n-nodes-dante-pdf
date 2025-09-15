@@ -1,5 +1,5 @@
 {
-  "name": "Convert to PDF Example1",
+  "name": "Convert to PDF Example2",
   "nodes": [
     {
       "parameters": {},
@@ -9,14 +9,16 @@
         -336,
         0
       ],
-      "id": "45b21b96-b54a-4647-86ba-1e89e9787557",
+      "id": "6464870e-f82e-4250-8003-2ba6d38a7117",
       "name": "When clicking ‘Execute workflow’"
     },
     {
       "parameters": {
         "conversionType": "htmlToPdf",
         "inputSource": "binaryData",
-        "additionalOptions": {},
+        "additionalOptions": {
+          "outputPropertyName": "data1"
+        },
         "htmlOptions": {}
       },
       "type": "n8n-nodes-dante-pdf.dantePdf",
@@ -25,7 +27,7 @@
         336,
         0
       ],
-      "id": "92108723-2d8b-4834-b486-7d39bd1a95a6",
+      "id": "14a3217c-058e-4073-991f-39f3831d313b",
       "name": "Dante PDF"
     },
     {
@@ -39,7 +41,7 @@
         -128,
         0
       ],
-      "id": "71d4f1e2-6b94-4058-bc4f-8b97c4edda9d",
+      "id": "74b64d42-33d4-4e14-8038-a55fe1ed3d24",
       "name": "HTTP Request"
     },
     {
@@ -56,7 +58,7 @@
         80,
         0
       ],
-      "id": "9895722d-9bf4-4ac8-873c-d14960930a9b",
+      "id": "ea11c692-d063-47ee-8ab8-a2e9d1c25263",
       "name": "Convert to File"
     },
     {
@@ -70,14 +72,16 @@
         80,
         192
       ],
-      "id": "aae31cd5-7e11-41bd-a327-37392cfa1d5e",
+      "id": "60934a9c-f638-4215-b25b-d10acfa5debe",
       "name": "Markdown"
     },
     {
       "parameters": {
         "conversionType": "htmlToPdf",
         "content": "={{ $json.data }}",
-        "additionalOptions": {},
+        "additionalOptions": {
+          "outputPropertyName": "data2"
+        },
         "htmlOptions": {}
       },
       "type": "n8n-nodes-dante-pdf.dantePdf",
@@ -86,8 +90,40 @@
         336,
         192
       ],
-      "id": "2cc77ca5-447e-4cb0-9955-670ba024935b",
+      "id": "dee30938-f434-4ca9-a275-76ccf3720a9b",
       "name": "Dante PDF1"
+    },
+    {
+      "parameters": {
+        "conversionType": "mergePdfs",
+        "additionalOptions": {
+          "outputPropertyName": "data"
+        },
+        "mergeOptions": {}
+      },
+      "type": "n8n-nodes-dante-pdf.dantePdf",
+      "typeVersion": 1,
+      "position": [
+        816,
+        96
+      ],
+      "id": "7c421b7d-3975-4f15-858e-5a882599b3b7",
+      "name": "Dante PDF2"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        576,
+        96
+      ],
+      "id": "c712965c-e16b-44d9-b89a-211bffeefed9",
+      "name": "Merge"
     }
   ],
   "pinData": {},
@@ -140,16 +176,49 @@
           }
         ]
       ]
+    },
+    "Dante PDF": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dante PDF1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Dante PDF2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "e301297e-b63e-480e-bb48-b13fc10d818c",
+  "versionId": "f801f24f-cf55-43ce-af94-123948a3aa2d",
   "meta": {
     "instanceId": "ae59e3c4dbc3b4aab3d81fc78280645903de4834ef0fa1a8e01178181c7a57a4"
   },
-  "id": "VfR4UAQCouTNQ1NO",
+  "id": "JC6KnoKXK4tEbbEC",
   "tags": []
 }

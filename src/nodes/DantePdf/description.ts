@@ -112,6 +112,9 @@ export const dantePdfDescription: INodeProperties[] = [
       show: {
         inputSource: ['binaryData'],
       },
+      hide: {
+        conversionType: ['mergePdfs'],
+      },
     },
     default: 'data',
     required: true,
@@ -450,6 +453,77 @@ export const dantePdfDescription: INodeProperties[] = [
         description: 'Quality of embedded images',
       },
     ],
+  },
+
+  // PDF Sources for Merge
+  {
+    displayName: 'PDF Sources',
+    name: 'pdfSources',
+    type: 'fixedCollection',
+    placeholder: 'Add PDF Source',
+    typeOptions: {
+      multipleValues: true,
+    },
+    displayOptions: {
+      show: {
+        conversionType: ['mergePdfs'],
+      },
+    },
+    default: {},
+    options: [
+      {
+        displayName: 'Sources',
+        name: 'sources',
+        values: [
+          {
+            displayName: 'Source Type',
+            name: 'sourceType',
+            type: 'options',
+            default: 'binary',
+            options: [
+              {
+                name: 'Binary Data',
+                value: 'binary',
+                description: 'Use binary data from previous node',
+              },
+              {
+                name: 'URL',
+                value: 'url',
+                description: 'Download PDF from URL',
+              },
+            ],
+          },
+          {
+            displayName: 'Binary Property',
+            name: 'binaryProperty',
+            type: 'string',
+            default: 'data',
+            required: true,
+            displayOptions: {
+              show: {
+                sourceType: ['binary'],
+              },
+            },
+            description: 'Name of the binary property containing the PDF',
+          },
+          {
+            displayName: 'URL',
+            name: 'url',
+            type: 'string',
+            default: '',
+            required: true,
+            displayOptions: {
+              show: {
+                sourceType: ['url'],
+              },
+            },
+            placeholder: 'https://example.com/document.pdf',
+            description: 'URL of the PDF to download',
+          },
+        ],
+      },
+    ],
+    description: 'Add PDF sources to merge',
   },
 
   // Merge Options

@@ -28,6 +28,7 @@ import {
   MergeOptions,
 } from '../../types';
 import { logger } from '../../utils/logger';
+import { resolveInputs, PdfSource } from '../../utils/resolveInputs';
 
 export class DantePdf implements INodeType {
   description: INodeTypeDescription = {
@@ -47,74 +48,70 @@ export class DantePdf implements INodeType {
   };
 
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
-    const items = this.getInputData();
     const returnData: INodeExecutionData[] = [];
     
     // Check if this is a PDF merge operation
     const firstConversionType = this.getNodeParameter('conversionType', 0) as ConversionType;
     
     if (firstConversionType === 'mergePdfs') {
-      // Handle PDF merge specially - collect all PDFs from all input items
+      // Handle PDF merge specially - collect PDFs using configured sources
       try {
         const mergeOptions = this.getNodeParameter('mergeOptions', 0, {}) as MergeOptions;
         const additionalOptions = this.getNodeParameter('additionalOptions', 0, {}) as any;
-        const allPdfs: Array<{ data: Buffer; mimeType: string; fileName: string }> = [];
         
-        // Collect PDFs from all input items
-        for (let i = 0; i < items.length; i++) {
-          const item = items[i];
-          if (item && item.binary) {
-            for (const [key, binary] of Object.entries(item.binary)) {
-              if ((binary as any).mimeType === 'application/pdf') {
-                allPdfs.push({
-                  data: Buffer.from((binary as any).data, 'base64'),
-                  mimeType: (binary as any).mimeType,
-                  fileName: (binary as any).fileName || `pdf_${i}_${key}.pdf`,
-                });
-              }
-            }
+        // Get PDF sources configuration
+        const pdfSourcesParam = this.getNodeParameter('pdfSources', 0, {}) as {
+          sources?: PdfSource[];
+        };
+        const sourcesConfig = pdfSourcesParam.sources || [];
+        
+        // Resolve all PDF inputs using the configured sources
+        const { paths: allPdfs, cleanup } = await resolveInputs(this, 0, sourcesConfig);
+        
+        try {
+          if (allPdfs.length < 2) {
+            throw new Error(`Need at least 2 PDFs to merge. Found ${allPdfs.length} PDF(s).`);
           }
+          
+          // Prepare merge input
+          const mergeInput = {
+            files: allPdfs,
+            options: mergeOptions,
+          };
+          
+          // Perform merge
+          const result = await performConversion('mergePdfs', mergeInput, { 
+            conversionType: 'mergePdfs',
+            mergeOptions 
+          });
+          
+          // Create output binary data
+          const outputPropertyName = additionalOptions.outputPropertyName || 'data';
+          const binaryData = {
+            [outputPropertyName]: {
+              data: result.pdf.toString('base64'),
+              mimeType: 'application/pdf',
+              fileName: generateFileName('mergePdfs', 0),
+              fileExtension: 'pdf',
+            },
+          };
+          
+          returnData.push({
+            json: {
+              success: true,
+              pages: result.metadata.pages || 0,
+              size: result.metadata.size,
+              processingTime: result.metadata.processingTime,
+              totalInputFiles: allPdfs.length,
+              mergedFiles: allPdfs.map(f => f.fileName),
+            },
+            binary: binaryData,
+            pairedItem: { item: 0 },
+          });
+        } finally {
+          // Always cleanup temporary files
+          await cleanup();
         }
-        
-        if (allPdfs.length < 2) {
-          throw new Error(`Need at least 2 PDFs to merge. Found ${allPdfs.length} PDF(s).`);
-        }
-        
-        // Prepare merge input
-        const mergeInput = {
-          files: allPdfs,
-          options: mergeOptions,
-        };
-        
-        // Perform merge
-        const result = await performConversion('mergePdfs', mergeInput, { 
-          conversionType: 'mergePdfs',
-          mergeOptions 
-        });
-        
-        // Create output binary data
-        const outputPropertyName = additionalOptions.outputPropertyName || 'data';
-        const binaryData = {
-          [outputPropertyName]: {
-            data: result.pdf.toString('base64'),
-            mimeType: 'application/pdf',
-            fileName: generateFileName('mergePdfs', 0),
-            fileExtension: 'pdf',
-          },
-        };
-        
-        returnData.push({
-          json: {
-            success: true,
-            pages: result.metadata.pages || 0,
-            size: result.metadata.size,
-            processingTime: result.metadata.processingTime,
-            totalInputFiles: allPdfs.length,
-            mergedFiles: allPdfs.map(f => f.fileName),
-          },
-          binary: binaryData,
-          pairedItem: { item: 0 },
-        });
       } catch (error) {
         if (this.continueOnFail()) {
           returnData.push({
@@ -132,6 +129,9 @@ export class DantePdf implements INodeType {
     }
     
     // Handle other conversion types normally (one by one)
+    // For non-merge operations, we process the input data
+    const items = this.getInputData();
+    
     for (let i = 0; i < items.length; i++) {
       try {
         const conversionType = this.getNodeParameter('conversionType', i) as ConversionType;
