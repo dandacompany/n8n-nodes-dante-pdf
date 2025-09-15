@@ -55,6 +55,9 @@ Thumbs.db
 # Test files
 test-files/
 test-outputs/
+test-output/
+test-*.js
+test-*.html
 
 # Package lock files (keep package-lock.json)
 # yarn.lock
