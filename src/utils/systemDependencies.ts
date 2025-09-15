@@ -1,4 +1,4 @@
-const detectLibc = require('detect-libc');
+// We'll detect libc without external dependencies to avoid conflicts with sharp
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
@@ -37,7 +37,27 @@ export class SystemDependencyInstaller {
 
     const platform = process.platform;
     const arch = process.arch;
-    const libc = platform === 'linux' ? (detectLibc && detectLibc.detect ? detectLibc.detect() : null) : null;
+    // Detect libc type without external dependencies
+    let libc: string | null = null;
+    if (platform === 'linux') {
+      try {
+        // Check for musl (Alpine Linux)
+        if (fs.existsSync('/etc/alpine-release')) {
+          libc = 'musl';
+        } else {
+          // Try to detect from ldd output
+          const { stdout } = await execAsync('ldd --version 2>&1', { timeout: 3000 });
+          if (stdout.includes('musl')) {
+            libc = 'musl';
+          } else if (stdout.includes('GNU') || stdout.includes('glibc')) {
+            libc = 'glibc';
+          }
+        }
+      } catch (error) {
+        // Fallback: assume glibc for non-Alpine Linux
+        libc = fs.existsSync('/etc/alpine-release') ? 'musl' : 'glibc';
+      }
+    }
 
     let distro = 'unknown';
     let isWSL = false;

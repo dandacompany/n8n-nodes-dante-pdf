@@ -9,6 +9,12 @@ const isDevelopment = process.env.NODE_ENV === 'development' ||
 
 async function setupDependencies() {
   try {
+    // Check if we're in a CI environment or npm install context that shouldn't run postinstall
+    if (process.env.CI || process.env.SKIP_POSTINSTALL) {
+      console.log('📦 [DantePDF] Skipping postinstall in CI/automated environment');
+      return;
+    }
+    
     console.log('🚀 [DantePDF] Setting up system dependencies for n8n-nodes-dante-pdf...');
     
     let SystemDependencyInstaller;

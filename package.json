@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-dante-pdf",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "n8n custom node for PDF conversion with support for Markdown, Text, DOCX, HTML, Image to PDF and PDF merging",
   "keywords": [
     "n8n-custom-node",
@@ -47,7 +47,7 @@
     "dev": "tsc -p tsconfig.json --watch",
     "link": "npm run build && node -e \"require('fs').cpSync('./dist', process.env.HOME+'/.n8n/custom/n8n-nodes-dante-pdf', {recursive:true, force:true}) && require('fs').cpSync('./package.json', process.env.HOME+'/.n8n/custom/n8n-nodes-dante-pdf/package.json', {force:true})\"",
     "prepack": "tsc -p tsconfig.json && npm run copy:assets",
-    "postinstall": "node scripts/setup-dependencies.js"
+    "postinstall": "node scripts/setup-dependencies.js || true"
   },
   "files": [
     "dist/**/*",
@@ -61,7 +61,6 @@
   "dependencies": {
     "@types/fs-extra": "^11.0.4",
     "@types/node-fetch": "^2.6.4",
-    "detect-libc": "^2.1.0",
     "fs-extra": "^11.3.1",
     "jsdom": "^24.0.0",
     "mammoth": "^1.7.0",
