@@ -47,6 +47,11 @@ export const dantePdfDescription: INodeProperties[] = [
     displayName: 'Input Source',
     name: 'inputSource',
     type: 'options',
+    displayOptions: {
+      hide: {
+        conversionType: ['mergePdfs'],
+      },
+    },
     options: [
       {
         name: 'Text Content',
@@ -66,6 +71,20 @@ export const dantePdfDescription: INodeProperties[] = [
     ],
     default: 'content',
     description: 'The source of the content to convert',
+  },
+  
+  // Special note for PDF merge
+  {
+    displayName: 'PDF Merge Input',
+    name: 'mergeInfo',
+    type: 'notice',
+    displayOptions: {
+      show: {
+        conversionType: ['mergePdfs'],
+      },
+    },
+    default: '',
+    description: '🔄 This node will automatically collect all PDF files from all input items and merge them into a single PDF. Connect multiple nodes with PDF outputs to merge them together.',
   },
 
   {
