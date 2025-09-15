@@ -1,4 +1,4 @@
-import { chromium, Browser, BrowserContext } from 'playwright-core';
+import { firefox, Browser, BrowserContext } from 'playwright-core';
 import { SystemDependencyInstaller } from './systemDependencies';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -101,15 +101,15 @@ export class BrowserSetup {
       }
     }
 
-    // Try Playwright's browser first (now installed in user directory)
+    // Try Playwright's Firefox browser first (better Alpine compatibility)
     try {
-      const playwrightPath = chromium.executablePath();
+      const playwrightPath = firefox.executablePath();
       if (playwrightPath && fs.existsSync(playwrightPath)) {
-        this.logger.success(`Using Playwright browser: ${playwrightPath}`);
+        this.logger.success(`Using Playwright Firefox: ${playwrightPath}`);
         return playwrightPath;
       }
     } catch (error) {
-      this.logger.warn(`Playwright browser not found: ${(error as Error).message}`);
+      this.logger.warn(`Playwright Firefox not found: ${(error as Error).message}`);
     }
 
     // If useSystemChrome is set or Playwright not found, try system browsers
@@ -131,7 +131,7 @@ export class BrowserSetup {
     }
 
     // Provide helpful error message
-    throw new Error(`No browser found. Please run: PLAYWRIGHT_BROWSERS_PATH=${os.homedir()}/.n8n/dante-pdf-browsers npx playwright-core install chromium`);
+    throw new Error(`No browser found. Please run: PLAYWRIGHT_BROWSERS_PATH=${os.homedir()}/.n8n/dante-pdf-browsers npx playwright-core install firefox`);
   }
 
   static async createOptimizedBrowser(options: BrowserSetupOptions = {}): Promise<BrowserLaunchResult> {
@@ -141,8 +141,8 @@ export class BrowserSetup {
     const launchOptions = this.generateLaunchOptions(systemInfo, executablePath, options);
 
     try {
-      this.logger.info(`Launching browser with optimized settings for ${systemInfo.platform}/${systemInfo.distro}...`);
-      const browser = await chromium.launch(launchOptions);
+      this.logger.info(`Launching Firefox with optimized settings for ${systemInfo.platform}/${systemInfo.distro}...`);
+      const browser = await firefox.launch(launchOptions);
       
       this.logger.success('Browser launched successfully');
       return {
@@ -160,11 +160,11 @@ export class BrowserSetup {
         delete launchOptions.executablePath;
         
         try {
-          const browser = await chromium.launch(launchOptions);
+          const browser = await firefox.launch(launchOptions);
           this.logger.success('Browser launched with fallback configuration');
           return {
             browser,
-            executablePath: chromium.executablePath(),
+            executablePath: firefox.executablePath(),
             systemOptimized: false
           };
         } catch (fallbackError) {

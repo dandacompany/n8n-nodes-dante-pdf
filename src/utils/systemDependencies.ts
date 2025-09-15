@@ -241,10 +241,10 @@ export class SystemDependencyInstaller {
   private static async installAlpineDependencies(systemInfo: SystemInfo): Promise<InstallResult> {
     this.logger.info('Installing Alpine Linux dependencies...');
     
-    // Core packages for Alpine - Install Chromium FIRST
+    // Core packages for Alpine - Install Firefox for better compatibility
     const packages = [
-      'chromium',              // System Chromium - MUST be first
-      'chromium-chromedriver', // Chromium driver for automation
+      'firefox',               // Firefox browser - better Alpine compatibility
+      'firefox-esr',           // Firefox ESR as alternative
       'gcompat',               // glibc compatibility 
       'libstdc++',             // C++ standard library
       'ttf-liberation',        // Fonts
