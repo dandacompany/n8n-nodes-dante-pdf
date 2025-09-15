@@ -69,9 +69,19 @@ export class BrowserInstaller {
         console.log(`DantePDF: Chromium not found at ${executablePath}`);
         return false;
       }
+
+      // Additional check: try to actually launch the browser to verify it works
+      console.log('DantePDF: Verifying Chromium installation...');
+      const browser = await chromium.launch({ 
+        headless: true,
+        timeout: 5000,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      });
+      await browser.close();
+      console.log('DantePDF: Chromium verification successful');
       return true;
     } catch (error) {
-      console.log('DantePDF: Chromium not installed');
+      console.log('DantePDF: Chromium verification failed:', error);
       return false;
     }
   }
@@ -80,15 +90,24 @@ export class BrowserInstaller {
     try {
       console.log('DantePDF: Installing Chromium...');
       
+      // Set environment for the installation
+      const env = {
+        ...process.env,
+        PLAYWRIGHT_BROWSERS_PATH: this.installationPath,
+        // Force installation even if already exists
+        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: undefined,
+      };
+      
       // Use npx to run playwright install for chromium only
-      const command = 'npx playwright-core install chromium';
+      const command = 'npx playwright-core install chromium --force';
+      
+      console.log(`DantePDF: Running command: ${command}`);
+      console.log(`DantePDF: Browser path: ${this.installationPath}`);
       
       execSync(command, {
         stdio: 'inherit',
-        env: {
-          ...process.env,
-          PLAYWRIGHT_BROWSERS_PATH: this.installationPath,
-        },
+        env,
+        timeout: 300000, // 5 minutes timeout
       });
       
       console.log('DantePDF: Chromium installed successfully');
@@ -98,16 +117,23 @@ export class BrowserInstaller {
         console.log('DantePDF: Installing system dependencies...');
         execSync('npx playwright-core install-deps chromium', {
           stdio: 'inherit',
-          env: {
-            ...process.env,
-            PLAYWRIGHT_BROWSERS_PATH: this.installationPath,
-          },
+          env,
+          timeout: 180000, // 3 minutes timeout
         });
+        console.log('DantePDF: System dependencies installed successfully');
       } catch (error) {
         // System dependencies might require sudo, so we'll just warn
         console.warn('DantePDF: Could not install system dependencies. Some features might not work.');
         console.warn('DantePDF: You may need to run: npx playwright-core install-deps chromium');
+        console.warn(`DantePDF: Error details: ${(error as Error).message}`);
       }
+
+      // Final verification
+      const finalCheck = await this.checkBrowserInstalled();
+      if (!finalCheck) {
+        throw new Error('Browser installation verification failed after installation');
+      }
+      
     } catch (error) {
       throw new Error(`Failed to install Chromium: ${(error as Error).message}`);
     }
