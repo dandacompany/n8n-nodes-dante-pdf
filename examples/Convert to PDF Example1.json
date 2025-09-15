@@ -1,0 +1,155 @@
+{
+  "name": "Convert to PDF Example1",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -336,
+        0
+      ],
+      "id": "45b21b96-b54a-4647-86ba-1e89e9787557",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "conversionType": "htmlToPdf",
+        "inputSource": "binaryData",
+        "additionalOptions": {},
+        "htmlOptions": {}
+      },
+      "type": "CUSTOM.dantePdf",
+      "typeVersion": 1,
+      "position": [
+        336,
+        0
+      ],
+      "id": "92108723-2d8b-4834-b486-7d39bd1a95a6",
+      "name": "Dante PDF"
+    },
+    {
+      "parameters": {
+        "url": "https://n.news.naver.com/article/newspaper/020/0003661036?date=20250915",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -128,
+        0
+      ],
+      "id": "71d4f1e2-6b94-4058-bc4f-8b97c4edda9d",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "data",
+        "options": {
+          "fileName": "test.html"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        0
+      ],
+      "id": "9895722d-9bf4-4ac8-873c-d14960930a9b",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "html": "={{ $json.data }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.markdown",
+      "typeVersion": 1,
+      "position": [
+        80,
+        192
+      ],
+      "id": "aae31cd5-7e11-41bd-a327-37392cfa1d5e",
+      "name": "Markdown"
+    },
+    {
+      "parameters": {
+        "conversionType": "htmlToPdf",
+        "content": "={{ $json.data }}",
+        "additionalOptions": {},
+        "htmlOptions": {}
+      },
+      "type": "CUSTOM.dantePdf",
+      "typeVersion": 1,
+      "position": [
+        336,
+        192
+      ],
+      "id": "2cc77ca5-447e-4cb0-9955-670ba024935b",
+      "name": "Dante PDF1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Dante PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Markdown": {
+      "main": [
+        [
+          {
+            "node": "Dante PDF1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e301297e-b63e-480e-bb48-b13fc10d818c",
+  "meta": {
+    "instanceId": "ae59e3c4dbc3b4aab3d81fc78280645903de4834ef0fa1a8e01178181c7a57a4"
+  },
+  "id": "VfR4UAQCouTNQ1NO",
+  "tags": []
+}
