@@ -1,13 +1,8 @@
-import { firefox, Browser, BrowserContext } from 'playwright-core';
+import { chromium, Browser, BrowserContext } from 'playwright-core';
 import { SystemDependencyInstaller } from './systemDependencies';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-
-// Set Playwright browsers path to n8n user directory
-if (!process.env.PLAYWRIGHT_BROWSERS_PATH) {
-  process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(os.homedir(), '.n8n', 'dante-pdf-browsers');
-}
 
 export interface BrowserSetupOptions {
   headless?: boolean;
@@ -29,7 +24,7 @@ export class BrowserSetup {
     info: (msg: string) => console.log(`[DantePDF] ${msg}`),
     warn: (msg: string) => console.warn(`[DantePDF] ⚠️  ${msg}`),
     error: (msg: string) => console.error(`[DantePDF] ❌ ${msg}`),
-    success: (msg: string) => console.log(`[DantePDF] ✅ ${msg}`)
+    success: (msg: string) => console.log(`[DantePDF] ✅ ${msg}`),
   };
 
   static async setupBrowser(options: BrowserSetupOptions = {}): Promise<string> {
@@ -37,7 +32,16 @@ export class BrowserSetup {
       return this.browserPath;
     }
 
+    const systemInfo = await SystemDependencyInstaller.detectSystem();
+
+    // Log system info for debugging
     this.logger.info('Setting up browser environment...');
+    this.logger.info(
+      `System: ${systemInfo.platform}/${systemInfo.arch}, Distribution: ${systemInfo.distro}, libc: ${systemInfo.libc}`
+    );
+
+    // Always prefer system Chrome/Chromium
+    this.logger.info('Looking for system Chrome/Chromium...');
 
     // Install system dependencies first
     const installResult = await SystemDependencyInstaller.installDependencies();
@@ -48,283 +52,175 @@ export class BrowserSetup {
       this.logger.warn(`System dependency installation had issues: ${installResult.message}`);
     }
 
-    const systemInfo = await SystemDependencyInstaller.detectSystem();
-    
-    // Try Playwright browser first for all platforms
-    // The postinstall script now downloads compatible browsers
-    this.logger.info(`Checking for Playwright browser in: ${process.env.PLAYWRIGHT_BROWSERS_PATH}`);
-    
     this.browserPath = await this.findOptimalBrowserPath(systemInfo, options);
 
     return this.browserPath;
   }
 
-  private static async findOptimalBrowserPath(systemInfo: any, options: BrowserSetupOptions): Promise<string> {
-    // Try different browser paths based on platform
+  private static async findOptimalBrowserPath(
+    systemInfo: any,
+    options: BrowserSetupOptions
+  ): Promise<string> {
     const candidatePaths: string[] = [];
 
+    // Platform-specific system Chrome/Chromium paths
     if (systemInfo.platform === 'win32') {
-      // Windows paths
       candidatePaths.push(
         'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
         'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-        'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+        'C:\\Program Files\\Chromium\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Chromium\\Application\\chrome.exe'
       );
     } else if (systemInfo.platform === 'darwin') {
-      // macOS paths
       candidatePaths.push(
         '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-        '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
         '/Applications/Chromium.app/Contents/MacOS/Chromium'
       );
     } else if (systemInfo.platform === 'linux') {
-      // Linux paths - Alpine paths FIRST for Alpine systems
+      // Linux paths - prioritize system installations
       if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
-        // Alpine-specific paths prioritized
+        // Alpine-specific paths
         candidatePaths.push(
-          '/usr/bin/chromium-browser',  // Most common Alpine Chromium path
           '/usr/bin/chromium',
-          '/usr/lib/chromium/chromium',  // Alternative Alpine location
-          '/usr/bin/google-chrome-stable',
-          '/usr/bin/google-chrome'
+          '/usr/bin/chromium-browser',
+          '/usr/lib/chromium/chromium',
+          '/usr/lib/chromium-browser/chromium-browser'
         );
       } else {
+        // Standard Linux paths
         candidatePaths.push(
-          '/usr/bin/google-chrome-stable',
-          '/usr/bin/google-chrome',
-          '/usr/bin/chromium-browser',
           '/usr/bin/chromium',
+          '/usr/bin/chromium-browser',
+          '/usr/bin/google-chrome',
+          '/usr/bin/google-chrome-stable',
+          '/usr/bin/google-chrome-beta',
+          '/usr/bin/google-chrome-unstable',
           '/snap/bin/chromium',
           '/var/lib/flatpak/app/org.chromium.Chromium/current/active/export/bin/org.chromium.Chromium'
         );
       }
     }
 
-    // Try Playwright's Firefox browser first (better Alpine compatibility)
-    try {
-      const playwrightPath = firefox.executablePath();
-      if (playwrightPath && fs.existsSync(playwrightPath)) {
-        this.logger.success(`Using Playwright Firefox: ${playwrightPath}`);
-        return playwrightPath;
-      }
-    } catch (error) {
-      this.logger.warn(`Playwright Firefox not found: ${(error as Error).message}`);
-    }
-
-    // If useSystemChrome is set or Playwright not found, try system browsers
-    if (options.useSystemChrome) {
-      for (const browserPath of candidatePaths) {
-        if (fs.existsSync(browserPath)) {
-          this.logger.success(`Found system browser: ${browserPath}`);
-          return browserPath;
-        }
-      }
-    }
-
-    // Try system browsers as final fallback
+    // First try system Chrome/Chromium
     for (const browserPath of candidatePaths) {
       if (fs.existsSync(browserPath)) {
-        this.logger.success(`Fallback to system browser: ${browserPath}`);
+        this.logger.success(`Found system Chrome/Chromium: ${browserPath}`);
         return browserPath;
       }
     }
 
+    // If system Chrome not found and not on Alpine, try Playwright's bundled Chrome
+    if (systemInfo.distro !== 'alpine' && systemInfo.libc !== 'musl') {
+      try {
+        const playwrightPath = chromium.executablePath();
+        if (playwrightPath && fs.existsSync(playwrightPath)) {
+          this.logger.warn('System Chrome not found, falling back to Playwright Chrome');
+          this.logger.warn('For better performance, install system Chrome');
+          return playwrightPath;
+        }
+      } catch (error) {
+        this.logger.warn(`Playwright Chrome not available: ${(error as Error).message}`);
+      }
+    }
+
     // Provide helpful error message
-    throw new Error(`No browser found. Please run: PLAYWRIGHT_BROWSERS_PATH=${os.homedir()}/.n8n/dante-pdf-browsers npx playwright-core install firefox`);
+    if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
+      throw new Error(
+        `No Chrome/Chromium browser found on Alpine Linux.\n` +
+          `\n` +
+          `Please install system Chromium:\n` +
+          `  apk add --no-cache chromium chromium-chromedriver\n` +
+          `\n` +
+          `For Docker users, add this to your Dockerfile:\n` +
+          `  RUN apk add --no-cache chromium chromium-chromedriver ttf-liberation fontconfig\n` +
+          `\n` +
+          `Note: Playwright bundled Chrome does NOT work on Alpine Linux (musl/glibc incompatibility)`
+      );
+    } else {
+      throw new Error(
+        `No Chrome/Chromium browser found.\n` +
+          `\n` +
+          `Please install Chrome or Chromium:\n` +
+          `  - Chrome: https://www.google.com/chrome/\n` +
+          `  - Chromium: Use your system package manager\n` +
+          `    Ubuntu/Debian: apt install chromium-browser\n` +
+          `    Fedora: dnf install chromium\n` +
+          `    Arch: pacman -S chromium\n`
+      );
+    }
   }
 
-  static async createOptimizedBrowser(options: BrowserSetupOptions = {}): Promise<BrowserLaunchResult> {
-    const executablePath = await this.setupBrowser(options);
+  static async createOptimizedBrowser(
+    options: BrowserSetupOptions = {}
+  ): Promise<BrowserLaunchResult> {
     const systemInfo = await SystemDependencyInstaller.detectSystem();
+    let executablePath: string;
+    let attempts = 0;
+    const maxAttempts = options.retryAttempts || 3;
 
-    const launchOptions = this.generateLaunchOptions(systemInfo, executablePath, options);
+    while (attempts < maxAttempts) {
+      try {
+        executablePath = await this.setupBrowser(options);
+        break;
+      } catch (setupError) {
+        attempts++;
+        this.logger.warn(
+          `Browser setup attempt ${attempts}/${maxAttempts} failed: ${(setupError as Error).message}`
+        );
 
+        if (attempts >= maxAttempts) {
+          throw setupError;
+        }
+
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+      }
+    }
+
+    const launchOptions = this.generateLaunchOptions(systemInfo, executablePath!, options);
+    
     try {
-      this.logger.info(`Launching Firefox with optimized settings for ${systemInfo.platform}/${systemInfo.distro}...`);
-      const browser = await firefox.launch(launchOptions);
+      this.logger.info(`Launching Chrome from: ${executablePath!}`);
+      const browser = await chromium.launch(launchOptions);
       
       this.logger.success('Browser launched successfully');
       return {
         browser,
-        executablePath,
-        systemOptimized: this.systemOptimized
+        executablePath: executablePath!,
+        systemOptimized: this.systemOptimized,
       };
-
     } catch (error) {
-      this.logger.error(`Browser launch failed: ${(error as Error).message}`);
-      
-      // Try fallback options
-      if (launchOptions.executablePath) {
-        this.logger.info('Trying fallback launch without executable path...');
-        delete launchOptions.executablePath;
-        
-        try {
-          const browser = await firefox.launch(launchOptions);
-          this.logger.success('Browser launched with fallback configuration');
-          return {
-            browser,
-            executablePath: firefox.executablePath(),
-            systemOptimized: false
-          };
-        } catch (fallbackError) {
-          this.logger.error(`Fallback launch also failed: ${(fallbackError as Error).message}`);
-        }
-      }
-
-      throw new Error(`Failed to launch browser: ${(error as Error).message}. Please ensure Chrome/Chromium is properly installed.`);
+      const errorMessage = this.generateComprehensiveErrorMessage(systemInfo, executablePath!);
+      throw new Error(errorMessage);
     }
   }
 
-  private static generateLaunchOptions(systemInfo: any, executablePath: string, options: BrowserSetupOptions): any {
+  private static generateLaunchOptions(
+    systemInfo: any,
+    executablePath: string,
+    options: BrowserSetupOptions
+  ): any {
     const launchOptions: any = {
       headless: options.headless !== false,
       executablePath,
       timeout: options.timeout || 30000,
-      args: []
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-extensions',
+      ],
     };
 
-    // Base security and performance arguments
-    const baseArgs = [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--no-first-run',
-      '--disable-default-apps',
-      '--disable-popup-blocking',
-      '--disable-translate',
-      '--disable-background-timer-throttling',
-      '--disable-backgrounding-occluded-windows',
-      '--disable-renderer-backgrounding',
-      '--disable-features=TranslateUI',
-      '--disable-ipc-flooding-protection'
-    ];
-
-    // Platform-specific optimizations
-    if (systemInfo.platform === 'win32') {
-      // Windows optimizations
+    // Alpine-specific optimizations
+    if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
       launchOptions.args.push(
-        ...baseArgs,
-        '--disable-features=VizDisplayCompositor',
-        '--disable-gpu-sandbox',
-        '--allow-running-insecure-content',
-        '--disable-web-security',
-        '--disable-features=site-per-process'
-      );
-
-      if (systemInfo.isWSL) {
-        // WSL-specific optimizations
-        launchOptions.args.push(
-          '--virtual-time-budget=5000',
-          '--no-zygote',
-          '--single-process'
-        );
-      }
-
-    } else if (systemInfo.platform === 'linux') {
-      launchOptions.args.push(...baseArgs);
-
-      if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
-        // Alpine/musl optimizations with complete audio/video disable
-        launchOptions.args.push(
-          '--no-zygote',
-          '--single-process',
-          '--disable-features=VizDisplayCompositor',
-          '--disable-software-rasterizer',
-          '--disable-background-networking',
-          '--disable-background-timer-throttling',
-          '--disable-client-side-phishing-detection',
-          '--disable-component-update',
-          '--disable-domain-reliability',
-          '--disable-features=AudioServiceOutOfProcess',
-          '--disable-hang-monitor',
-          '--disable-notifications',
-          '--disable-offer-store-unmasked-wallet-cards',
-          '--disable-print-preview',
-          '--disable-prompt-on-repost',
-          '--disable-speech-api',
-          '--disable-sync',
-          '--disable-tab-for-desktop-share',
-          '--disable-voice-input',
-          '--disable-wake-on-wifi',
-          '--enable-async-dns',
-          '--enable-simple-cache-backend',
-          '--enable-tcp-fast-open',
-          '--media-cache-size=33554432',
-          '--aggressive-cache-discard',
-          '--use-simple-cache-backend=on',
-          // Complete audio subsystem disable
-          '--disable-features=AudioServiceSandbox',
-          '--disable-audio-output',
-          '--disable-audio-input',
-          '--mute-audio',
-          '--no-audio',
-          '--disable-features=AudioServiceOutOfProcess,AudioServiceSandbox',
-          '--disable-web-audio',
-          '--disable-speech-synthesis',
-          '--disable-speech-dispatcher',
-          // Additional Alpine/Docker compatibility
-          '--disable-features=UseOzonePlatform',
-          '--disable-blink-features=AutomationControlled',
-          '--disable-features=IsolateOrigins,site-per-process',
-          '--disable-site-isolation-trials',
-          '--disable-features=BlockInsecurePrivateNetworkRequests',
-          '--disable-features=OutOfBlinkCors',
-          // Force software rendering
-          '--use-gl=swiftshader',
-          '--disable-gpu-sandbox',
-          '--disable-software-rasterizer',
-          '--disable-features=VizDisplayCompositor,VizHitTestSurfaceLayer',
-          // Permissions
-          '--no-first-run',
-          '--no-default-browser-check',
-          '--disable-features=RendererCodeIntegrity'
-        );
-      } else {
-        // Regular Linux optimizations
-        launchOptions.args.push(
-          '--disable-accelerated-2d-canvas',
-          '--disable-accelerated-jpeg-decoding',
-          '--disable-accelerated-mjpeg-decode',
-          '--disable-accelerated-video-decode',
-          '--disable-accelerated-video-encode'
-        );
-      }
-
-      if (systemInfo.isWSL) {
-        // WSL optimizations
-        launchOptions.args.push(
-          '--virtual-time-budget=5000',
-          '--no-zygote',
-          '--single-process'
-        );
-      }
-
-    } else if (systemInfo.platform === 'darwin') {
-      // macOS optimizations
-      launchOptions.args.push(
-        ...baseArgs,
-        '--disable-accelerated-2d-canvas',
-        '--disable-accelerated-jpeg-decoding'
-      );
-    }
-
-    // Memory and performance optimizations
-    launchOptions.args.push(
-      '--memory-pressure-off',
-      '--max_old_space_size=4096',
-      '--no-pings',
-      '--disable-client-side-phishing-detection',
-      '--disable-component-update',
-      '--disable-hang-monitor'
-    );
-
-    // Font and rendering optimizations
-    if (systemInfo.platform === 'linux') {
-      launchOptions.args.push(
-        '--font-render-hinting=none',
-        '--disable-font-subpixel-positioning'
+        '--disable-software-rasterizer',
+        '--disable-features=VizDisplayCompositor'
       );
     }
 
@@ -332,8 +228,6 @@ export class BrowserSetup {
   }
 
   static async createOptimizedContext(browser: Browser): Promise<BrowserContext> {
-    const systemInfo = await SystemDependencyInstaller.detectSystem();
-    
     const contextOptions: any = {
       viewport: { width: 1920, height: 1080 },
       deviceScaleFactor: 1,
@@ -341,17 +235,8 @@ export class BrowserSetup {
       isMobile: false,
       javaScriptEnabled: true,
       acceptDownloads: false,
-      ignoreHTTPSErrors: true
+      ignoreHTTPSErrors: true,
     };
-
-    // Platform-specific context optimizations
-    if (systemInfo.platform === 'linux' && (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl')) {
-      // Alpine-specific context settings
-      contextOptions.extraHTTPHeaders = {
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate'
-      };
-    }
 
     const context = await browser.newContext(contextOptions);
 
@@ -384,22 +269,105 @@ export class BrowserSetup {
     available: boolean;
     executablePath?: string;
     systemOptimized: boolean;
+    chromeVersion?: string;
+    playwrightReady: boolean;
+    systemChromeReady: boolean;
     error?: string;
+    troubleshooting?: string[];
   }> {
+    const systemInfo = await SystemDependencyInstaller.detectSystem();
+
     try {
       const executablePath = await this.setupBrowser();
+
+      let chromeVersion: string | undefined;
+      let playwrightReady = false;
+      let systemChromeReady = false;
+
+      // Check Playwright Chrome (not on Alpine)
+      if (systemInfo.distro !== 'alpine' && systemInfo.libc !== 'musl') {
+        try {
+          const playwrightPath = chromium.executablePath();
+          if (fs.existsSync(playwrightPath)) {
+            playwrightReady = true;
+          }
+        } catch (e) {
+          // Playwright Chrome not available
+        }
+      }
+
+      // Check system Chrome
+      const systemPaths = [
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable'
+      ];
+      for (const chromePath of systemPaths) {
+        if (fs.existsSync(chromePath)) {
+          systemChromeReady = true;
+          break;
+        }
+      }
+
       return {
         available: true,
         executablePath,
-        systemOptimized: this.systemOptimized
+        systemOptimized: this.systemOptimized,
+        ...(chromeVersion && { chromeVersion }),
+        playwrightReady,
+        systemChromeReady,
       };
     } catch (error) {
+      const troubleshooting: string[] = [];
+
+      if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
+        troubleshooting.push('Alpine Linux detected. System Chromium is required.');
+        troubleshooting.push('Install Chromium: apk add --no-cache chromium chromium-chromedriver');
+      } else {
+        troubleshooting.push('Install Chrome or Chromium from your package manager');
+      }
+
       return {
         available: false,
         systemOptimized: false,
-        error: (error as Error).message
+        playwrightReady: false,
+        systemChromeReady: false,
+        error: (error as Error).message,
+        troubleshooting,
       };
     }
+  }
+
+  private static generateComprehensiveErrorMessage(
+    systemInfo: any,
+    executablePath: string
+  ): string {
+    const messages: string[] = [
+      `Failed to launch Chrome/Chromium browser.`,
+      `System: ${systemInfo.platform}/${systemInfo.distro}`,
+      `Attempted executable: ${executablePath}`,
+      '',
+    ];
+
+    if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
+      messages.push('Alpine Linux Troubleshooting:');
+      messages.push('1. Install Chromium:');
+      messages.push('   apk add --no-cache chromium chromium-chromedriver');
+      messages.push('');
+      messages.push('2. Install fonts and dependencies:');
+      messages.push('   apk add --no-cache ttf-liberation fontconfig');
+      messages.push('');
+      messages.push('3. Check browser permissions:');
+      messages.push('   ls -la /usr/bin/chromium');
+    } else {
+      messages.push('General Troubleshooting:');
+      messages.push('1. Ensure Chrome or Chromium is installed');
+      messages.push('2. Check file permissions');
+      messages.push('3. Verify system dependencies');
+    }
+
+    return messages.join('\n');
   }
 
   static async cleanup(): Promise<void> {

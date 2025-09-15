@@ -29,7 +29,7 @@ export class SystemDependencyInstaller {
     info: (msg: string) => console.log(`[DantePDF] ${msg}`),
     warn: (msg: string) => console.warn(`[DantePDF] ⚠️  ${msg}`),
     error: (msg: string) => console.error(`[DantePDF] ❌ ${msg}`),
-    success: (msg: string) => console.log(`[DantePDF] ✅ ${msg}`)
+    success: (msg: string) => console.log(`[DantePDF] ✅ ${msg}`),
   };
 
   static async detectSystem(): Promise<SystemInfo> {
@@ -66,7 +66,9 @@ export class SystemDependencyInstaller {
     try {
       if (platform === 'win32') {
         // Windows detection
-        const { stdout } = await execAsync('wmic os get Caption,Version /format:csv', { timeout: 5000 });
+        const { stdout } = await execAsync('wmic os get Caption,Version /format:csv', {
+          timeout: 5000,
+        });
         const lines = stdout.split('\n').filter(line => line.includes('Microsoft'));
         if (lines.length > 0 && lines[0]) {
           const parts = lines[0].split(',');
@@ -81,7 +83,6 @@ export class SystemDependencyInstaller {
         } catch (error) {
           // WSL not available
         }
-
       } else if (platform === 'linux') {
         // Linux distribution detection
         if (fs.existsSync('/etc/alpine-release')) {
@@ -100,11 +101,11 @@ export class SystemDependencyInstaller {
         // Check for WSL on Linux
         try {
           const { stdout } = await execAsync('uname -r', { timeout: 3000 });
-          isWSL = stdout.toLowerCase().includes('microsoft') || stdout.toLowerCase().includes('wsl');
+          isWSL =
+            stdout.toLowerCase().includes('microsoft') || stdout.toLowerCase().includes('wsl');
         } catch (error) {
           // Ignore error
         }
-
       } else if (platform === 'darwin') {
         distro = 'macos';
         try {
@@ -119,8 +120,10 @@ export class SystemDependencyInstaller {
     }
 
     this.systemInfo = { platform, arch, libc, distro, isWSL, osVersion };
-    this.logger.info(`Detected system: ${platform}/${arch}, distro: ${distro}, libc: ${libc}, WSL: ${isWSL}`);
-    
+    this.logger.info(
+      `Detected system: ${platform}/${arch}, distro: ${distro}, libc: ${libc}, WSL: ${isWSL}`
+    );
+
     return this.systemInfo;
   }
 
@@ -149,32 +152,31 @@ export class SystemDependencyInstaller {
 
       return {
         success: true,
-        message: `No dependency installation required for ${systemInfo.platform}/${systemInfo.distro}`
+        message: `No dependency installation required for ${systemInfo.platform}/${systemInfo.distro}`,
       };
-
     } catch (error) {
       const errorMsg = `Failed to install system dependencies: ${(error as Error).message}`;
       this.logger.error(errorMsg);
       return {
         success: false,
-        message: errorMsg
+        message: errorMsg,
       };
     }
   }
 
   private static async installWindowsDependencies(systemInfo: SystemInfo): Promise<InstallResult> {
     this.logger.info('Installing Windows dependencies...');
-    
+
     const installedPackages: string[] = [];
     const failedPackages: string[] = [];
 
     try {
       // Check if Chocolatey is available
       const hasChoco = await this.checkCommand('choco --version');
-      
+
       if (hasChoco) {
         const packages = ['vcredist2019', 'visualcpp-build-tools'];
-        
+
         for (const pkg of packages) {
           try {
             this.logger.info(`Installing ${pkg} via Chocolatey...`);
@@ -187,7 +189,9 @@ export class SystemDependencyInstaller {
           }
         }
       } else {
-        this.logger.warn('Chocolatey not found. Please install Visual C++ Redistributable manually.');
+        this.logger.warn(
+          'Chocolatey not found. Please install Visual C++ Redistributable manually.'
+        );
       }
 
       // Check if Windows Features can be enabled
@@ -203,30 +207,29 @@ export class SystemDependencyInstaller {
         success: true,
         message: `Windows dependencies installation completed. Installed: ${installedPackages.length}, Failed: ${failedPackages.length}`,
         installedPackages,
-        failedPackages
+        failedPackages,
       };
-
     } catch (error) {
       return {
         success: false,
         message: `Windows dependency installation failed: ${(error as Error).message}`,
-        failedPackages
+        failedPackages,
       };
     }
   }
 
   private static async installWSLDependencies(systemInfo: SystemInfo): Promise<InstallResult> {
     this.logger.info('Installing WSL (Windows Subsystem for Linux) dependencies...');
-    
+
     // WSL usually runs Ubuntu/Debian, so use Debian installation
     const debianResult = await this.installDebianDependencies(systemInfo);
-    
+
     // Additional WSL-specific optimizations
     try {
       // WSL-specific environment variables
       process.env.DISPLAY = process.env.DISPLAY || ':0';
       process.env.PULSE_RUNTIME_PATH = process.env.PULSE_RUNTIME_PATH || '/mnt/wslg/runtime';
-      
+
       this.logger.info('WSL environment optimized');
     } catch (error) {
       this.logger.warn(`WSL optimization failed: ${(error as Error).message}`);
@@ -234,45 +237,45 @@ export class SystemDependencyInstaller {
 
     return {
       ...debianResult,
-      message: `WSL ${debianResult.message}`
+      message: `WSL ${debianResult.message}`,
     };
   }
 
   private static async installAlpineDependencies(systemInfo: SystemInfo): Promise<InstallResult> {
     this.logger.info('Installing Alpine Linux dependencies...');
-    
-    // Core packages for Alpine - Install Firefox for better compatibility
+
+    // Core packages for Alpine - Install Chromium
     const packages = [
-      'firefox',               // Firefox browser - better Alpine compatibility
-      'firefox-esr',           // Firefox ESR as alternative
-      'gcompat',               // glibc compatibility 
-      'libstdc++',             // C++ standard library
-      'ttf-liberation',        // Fonts
-      'fontconfig',            // Font configuration
-      'cairo',                 // Graphics library
-      'pango',                 // Text rendering
-      'gdk-pixbuf',            // Image loading
-      'gtk+3.0',               // GTK (for some dependencies)
-      'nss',                   // Network Security Services
-      'freetype',              // Font rendering
-      'harfbuzz',              // Text shaping
-      'alsa-lib',              // ALSA sound library (required even in headless mode)
-      'alsa-lib-dev',          // ALSA development files
-      'pulseaudio-libs',       // PulseAudio libraries (fallback for audio)
-      'libx11',                // X11 library
-      'libxcomposite',         // X11 Composite extension
-      'libxdamage',            // X11 Damage extension
-      'libxext',               // X11 miscellaneous extensions
-      'libxfixes',             // X11 Fixes extension
-      'libxrandr',             // X11 RandR extension
-      'libxcb',                // X protocol C-language Binding
-      'libxkbcommon',          // Keyboard handling
-      'cups-libs',             // CUPS printing system
-      'dbus-libs',             // D-Bus library
-      'atk',                   // Accessibility toolkit
-      'at-spi2-atk',           // AT-SPI2 ATK bridge
-      'eudev-libs',            // udev library
-      'mesa-gbm'               // GBM library
+      'chromium', // Chromium browser
+      'chromium-chromedriver', // ChromeDriver for automation
+      'gcompat', // glibc compatibility
+      'libstdc++', // C++ standard library
+      'ttf-liberation', // Fonts
+      'fontconfig', // Font configuration
+      'cairo', // Graphics library
+      'pango', // Text rendering
+      'gdk-pixbuf', // Image loading
+      'gtk+3.0', // GTK (for some dependencies)
+      'nss', // Network Security Services
+      'freetype', // Font rendering
+      'harfbuzz', // Text shaping
+      'alsa-lib', // ALSA sound library (required even in headless mode)
+      'alsa-lib-dev', // ALSA development files
+      'pulseaudio-libs', // PulseAudio libraries (fallback for audio)
+      'libx11', // X11 library
+      'libxcomposite', // X11 Composite extension
+      'libxdamage', // X11 Damage extension
+      'libxext', // X11 miscellaneous extensions
+      'libxfixes', // X11 Fixes extension
+      'libxrandr', // X11 RandR extension
+      'libxcb', // X protocol C-language Binding
+      'libxkbcommon', // Keyboard handling
+      'cups-libs', // CUPS printing system
+      'dbus-libs', // D-Bus library
+      'atk', // Accessibility toolkit
+      'at-spi2-atk', // AT-SPI2 ATK bridge
+      'eudev-libs', // udev library
+      'mesa-gbm', // GBM library
     ];
 
     // Additional packages for musl environments
@@ -291,8 +294,11 @@ export class SystemDependencyInstaller {
       for (const pkg of packages) {
         try {
           // Check if package is already installed
-          const { stdout } = await execAsync(`apk info ${pkg} 2>/dev/null || echo "not_installed"`, { timeout: 10000 });
-          
+          const { stdout } = await execAsync(
+            `apk info ${pkg} 2>/dev/null || echo "not_installed"`,
+            { timeout: 10000 }
+          );
+
           if (stdout.includes('not_installed')) {
             this.logger.info(`Installing ${pkg}...`);
             await execAsync(`apk add --no-cache ${pkg}`, { timeout: 120000 });
@@ -312,21 +318,20 @@ export class SystemDependencyInstaller {
         success: failedPackages.length < packages.length / 2, // Success if more than half succeeded
         message: `Alpine dependencies installation completed. Installed: ${installedPackages.length}, Failed: ${failedPackages.length}`,
         installedPackages,
-        failedPackages
+        failedPackages,
       };
-
     } catch (error) {
       return {
         success: false,
         message: `Alpine dependency installation failed: ${(error as Error).message}`,
-        failedPackages
+        failedPackages,
       };
     }
   }
 
   private static async installDebianDependencies(systemInfo: SystemInfo): Promise<InstallResult> {
     this.logger.info('Installing Debian/Ubuntu dependencies...');
-    
+
     const packages = [
       'libnss3',
       'libatk-bridge2.0-0',
@@ -342,7 +347,7 @@ export class SystemDependencyInstaller {
       'libglib2.0-0',
       'fonts-liberation',
       'libappindicator3-1',
-      'xdg-utils'
+      'xdg-utils',
     ];
 
     const installedPackages: string[] = [];
@@ -352,7 +357,7 @@ export class SystemDependencyInstaller {
       // Update package index
       this.logger.info('Updating package index...');
       await execAsync('apt-get update -qq', { timeout: 120000 });
-      
+
       // Install packages in batch for efficiency
       try {
         const installCmd = `apt-get install -y ${packages.join(' ')}`;
@@ -363,7 +368,7 @@ export class SystemDependencyInstaller {
       } catch (batchError) {
         // If batch install fails, try individual installation
         this.logger.warn('Batch installation failed, trying individual packages...');
-        
+
         for (const pkg of packages) {
           try {
             await execAsync(`apt-get install -y ${pkg}`, { timeout: 60000 });
@@ -380,21 +385,20 @@ export class SystemDependencyInstaller {
         success: failedPackages.length < packages.length / 2,
         message: `Debian dependencies installation completed. Installed: ${installedPackages.length}, Failed: ${failedPackages.length}`,
         installedPackages,
-        failedPackages
+        failedPackages,
       };
-
     } catch (error) {
       return {
         success: false,
         message: `Debian dependency installation failed: ${(error as Error).message}`,
-        failedPackages
+        failedPackages,
       };
     }
   }
 
   private static async installRedHatDependencies(systemInfo: SystemInfo): Promise<InstallResult> {
     this.logger.info('Installing RedHat/CentOS dependencies...');
-    
+
     const packages = [
       'nss',
       'atk',
@@ -405,7 +409,7 @@ export class SystemDependencyInstaller {
       'libXrandr',
       'libgbm',
       'libXss',
-      'alsa-lib'
+      'alsa-lib',
     ];
 
     const installedPackages: string[] = [];
@@ -413,7 +417,7 @@ export class SystemDependencyInstaller {
 
     try {
       // Try yum first, then dnf
-      const packageManager = await this.checkCommand('dnf --version') ? 'dnf' : 'yum';
+      const packageManager = (await this.checkCommand('dnf --version')) ? 'dnf' : 'yum';
       this.logger.info(`Using ${packageManager} package manager...`);
 
       for (const pkg of packages) {
@@ -431,21 +435,20 @@ export class SystemDependencyInstaller {
         success: failedPackages.length < packages.length / 2,
         message: `RedHat dependencies installation completed. Installed: ${installedPackages.length}, Failed: ${failedPackages.length}`,
         installedPackages,
-        failedPackages
+        failedPackages,
       };
-
     } catch (error) {
       return {
         success: false,
         message: `RedHat dependency installation failed: ${(error as Error).message}`,
-        failedPackages
+        failedPackages,
       };
     }
   }
 
   private static async installArchDependencies(systemInfo: SystemInfo): Promise<InstallResult> {
     this.logger.info('Installing Arch Linux dependencies...');
-    
+
     const packages = [
       'nss',
       'atk',
@@ -455,7 +458,7 @@ export class SystemDependencyInstaller {
       'libxrandr',
       'mesa',
       'libxss',
-      'alsa-lib'
+      'alsa-lib',
     ];
 
     const installedPackages: string[] = [];
@@ -477,27 +480,26 @@ export class SystemDependencyInstaller {
         success: failedPackages.length < packages.length / 2,
         message: `Arch dependencies installation completed. Installed: ${installedPackages.length}, Failed: ${failedPackages.length}`,
         installedPackages,
-        failedPackages
+        failedPackages,
       };
-
     } catch (error) {
       return {
         success: false,
         message: `Arch dependency installation failed: ${(error as Error).message}`,
-        failedPackages
+        failedPackages,
       };
     }
   }
 
   private static async installMacOSDependencies(systemInfo: SystemInfo): Promise<InstallResult> {
     this.logger.info('Installing macOS dependencies...');
-    
+
     // macOS usually has most dependencies built-in or available via Xcode Command Line Tools
     try {
       // Check for Xcode Command Line Tools
       await execAsync('xcode-select --print-path', { timeout: 10000 });
       this.logger.success('Xcode Command Line Tools detected');
-      
+
       // Check for Homebrew
       const hasBrew = await this.checkCommand('brew --version');
       if (hasBrew) {
@@ -509,15 +511,16 @@ export class SystemDependencyInstaller {
       return {
         success: true,
         message: 'macOS dependencies verified successfully',
-        installedPackages: ['xcode-command-line-tools']
+        installedPackages: ['xcode-command-line-tools'],
       };
-
     } catch (error) {
-      this.logger.warn('Xcode Command Line Tools not found. Please install with: xcode-select --install');
+      this.logger.warn(
+        'Xcode Command Line Tools not found. Please install with: xcode-select --install'
+      );
       return {
         success: false,
         message: 'Please install Xcode Command Line Tools: xcode-select --install',
-        failedPackages: ['xcode-command-line-tools']
+        failedPackages: ['xcode-command-line-tools'],
       };
     }
   }
@@ -531,12 +534,15 @@ export class SystemDependencyInstaller {
     }
   }
 
-  static async getSystemStatus(): Promise<{systemInfo: SystemInfo, dependenciesInstalled: boolean}> {
+  static async getSystemStatus(): Promise<{
+    systemInfo: SystemInfo;
+    dependenciesInstalled: boolean;
+  }> {
     const systemInfo = await this.detectSystem();
-    
+
     // Quick check if dependencies are likely installed
     let dependenciesInstalled = true;
-    
+
     try {
       if (systemInfo.platform === 'linux') {
         if (systemInfo.distro === 'alpine') {

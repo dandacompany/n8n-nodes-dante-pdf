@@ -16,8 +16,9 @@ async function setupDependencies() {
     }
     
     console.log('🚀 [DantePDF] Setting up system dependencies for n8n-nodes-dante-pdf...');
+    console.log('🌐 [DantePDF] Using system Chrome/Chromium for optimal compatibility');
     
-    // Playwright browser will be downloaded by postinstall npm script
+    // System Chrome/Chromium will be used
     
     let SystemDependencyInstaller;
     let BrowserSetup;
@@ -66,8 +67,45 @@ async function setupDependencies() {
     if (systemInfo.isWSL) {
       console.log('🐧 [DantePDF] WSL (Windows Subsystem for Linux) detected');
     }
-
-    // Additional system info logging (Alpine already handled above)
+    
+    // Special handling for Alpine Linux
+    if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
+      console.log('');
+      console.log('🏔️  [DantePDF] ========== ALPINE LINUX DETECTED ==========');
+      console.log('⚠️  [DantePDF] Alpine Linux requires system Chromium');
+      console.log('❌ [DantePDF] Playwright browsers do NOT work on Alpine (musl/glibc incompatibility)');
+      console.log('✅ [DantePDF] You MUST install system Chromium instead');
+      console.log('');
+      console.log('📦 [DantePDF] Please run the following command:');
+      console.log('    apk add --no-cache chromium chromium-chromedriver ttf-liberation fontconfig');
+      console.log('');
+      console.log('🐳 [DantePDF] For Docker users, add to your Dockerfile:');
+      console.log('    RUN apk add --no-cache chromium chromium-chromedriver ttf-liberation fontconfig');
+      console.log('');
+      
+      // Check if Chromium is already installed
+      const chromiumPaths = ['/usr/bin/chromium', '/usr/bin/chromium-browser'];
+      let chromiumFound = false;
+      for (const path of chromiumPaths) {
+        if (fs.existsSync(path)) {
+          console.log(`✅ [DantePDF] System Chromium found at: ${path}`);
+          chromiumFound = true;
+          break;
+        }
+      }
+      
+      if (!chromiumFound) {
+        console.log('❌ [DantePDF] System Chromium NOT found - PDF generation will fail!');
+        console.log('⚠️  [DantePDF] Please install Chromium now: apk add --no-cache chromium chromium-chromedriver');
+      }
+      
+      console.log('🏔️  [DantePDF] ==========================================');
+      console.log('');
+      
+      // Skip Playwright installation on Alpine
+      console.log('⏭️  [DantePDF] Skipping Playwright browser installation on Alpine');
+      return;
+    }
 
     // Install system dependencies
     console.log('📦 [DantePDF] Installing system dependencies...');
@@ -111,28 +149,50 @@ async function setupDependencies() {
       console.warn('💡 [DantePDF] Browser will be configured during first PDF generation');
     }
 
+    // Enhanced browser environment check
+    const browserAvailable = await checkBrowserAvailable();
+    const browserPath = process.env.PLAYWRIGHT_BROWSERS_PATH || path.join(require('os').homedir(), '.n8n', 'dante-pdf-browsers');
+    
     // Installation summary
     console.log('\n📊 [DantePDF] Installation Summary:');
-    console.log(`    Platform: ${systemInfo.platform}/${systemInfo.distro}`);
+    console.log(`    Platform: ${systemInfo.platform}/${systemInfo.distro} (${systemInfo.libc || 'unknown'})`);
     console.log(`    Dependencies: ${installResult.success ? '✅ Installed' : '⚠️  Partial'}`);
-    console.log(`    Browser: ${await checkBrowserAvailable() ? '✅ Ready' : '⚠️  Will setup on first use'}`);
+    console.log(`    Chrome/Chromium Browser: ${browserAvailable ? '✅ Ready' : '⚠️  Will install on first use'}`);
+    console.log(`    Browser Directory: ${browserPath}`);
+    
+    if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
+      console.log('    Alpine Linux: ✅ System Chromium configuration active');
+    }
+    
     console.log('\n🎉 [DantePDF] Setup completed! The node is ready for use.');
 
     // Platform-specific guidance
-    if (!installResult.success) {
+    if (!installResult.success || !browserAvailable) {
       console.log('\n💡 [DantePDF] Manual installation guidance:');
       
       if (systemInfo.platform === 'linux') {
         if (systemInfo.distro === 'alpine') {
           console.log('    For Alpine Linux:');
-          console.log('    apk add --no-cache gcompat libstdc++ chromium ttf-liberation fontconfig');
+          console.log('    apk add --no-cache chromium chromium-chromedriver ttf-liberation fontconfig');
         } else if (systemInfo.distro === 'debian') {
           console.log('    For Debian/Ubuntu:');
-          console.log('    sudo apt-get update && sudo apt-get install -y libnss3 libatk-bridge2.0-0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libxss1 libasound2');
+          console.log('    sudo apt-get update && sudo apt-get install -y chromium-browser');
+          console.log('    sudo apt-get install -y libnss3 libatk-bridge2.0-0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libxss1 libasound2');
         }
       } else if (systemInfo.platform === 'win32') {
         console.log('    For Windows:');
-        console.log('    Install Visual C++ Redistributable and consider using Chocolatey for dependencies');
+        console.log('    Install Google Chrome from https://www.google.com/chrome/');
+        console.log('    Install Visual C++ Redistributable if needed');
+      } else if (systemInfo.platform === 'darwin') {
+        console.log('    For macOS:');
+        console.log('    Install Chrome from https://www.google.com/chrome/');
+      }
+      
+      if (!browserAvailable) {
+        console.log('\n🔥 [DantePDF] Browser Installation Priority:');
+        console.log('    1. System Chrome/Chromium (recommended) - install via package manager');
+        console.log('    2. Playwright Chrome (fallback) - automatically downloaded');
+        console.log('    Note: System Chrome/Chromium is required for Alpine Linux');
       }
     }
 
@@ -147,10 +207,37 @@ async function setupDependencies() {
 
 async function checkBrowserAvailable() {
   try {
-    const { chromium } = require('playwright-core');
-    const executablePath = chromium.executablePath();
-    return fs.existsSync(executablePath);
+    // Check Playwright Firefox first (our primary browser)
+    const { firefox } = require('playwright-core');
+    const firefoxPath = firefox.executablePath();
+    
+    if (fs.existsSync(firefoxPath)) {
+      console.log(`✅ [DantePDF] Playwright Firefox found: ${firefoxPath}`);
+      return true;
+    }
+    
+    console.log('⚠️  [DantePDF] Playwright Firefox not found, checking system Firefox...');
+    
+    // Check system Firefox installations
+    const systemFirefoxPaths = [
+      '/usr/bin/firefox',
+      '/usr/bin/firefox-esr',
+      '/Applications/Firefox.app/Contents/MacOS/firefox',
+      'C:\\Program Files\\Mozilla Firefox\\firefox.exe',
+      'C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe'
+    ];
+    
+    for (const firefoxPath of systemFirefoxPaths) {
+      if (fs.existsSync(firefoxPath)) {
+        console.log(`✅ [DantePDF] System Firefox found: ${firefoxPath}`);
+        return true;
+      }
+    }
+    
+    console.log('⚠️  [DantePDF] No Firefox installation found');
+    return false;
   } catch (error) {
+    console.log(`⚠️  [DantePDF] Browser check failed: ${error.message}`);
     return false;
   }
 }

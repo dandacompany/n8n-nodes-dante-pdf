@@ -27,10 +27,10 @@ export class MarkdownConverter extends BaseConverter<MarkdownOptions> {
 
   async convert(input: ConversionInput<MarkdownOptions>): Promise<Buffer> {
     let page: Page | null = null;
-    
+
     try {
       const options = input.options || {};
-      
+
       // Get markdown content
       const markdown = this.getContent(input);
 
@@ -52,7 +52,7 @@ export class MarkdownConverter extends BaseConverter<MarkdownOptions> {
         const browserResult = await BrowserSetup.createOptimizedBrowser({
           headless: true,
           timeout: 30000,
-          useSystemChrome: true
+          useSystemChrome: true,
         });
         this.browser = browserResult.browser;
       }
@@ -254,9 +254,11 @@ export class MarkdownConverter extends BaseConverter<MarkdownOptions> {
     switch (theme) {
       case 'github':
         return baseStyles;
-      
+
       case 'dark':
-        return baseStyles + `
+        return (
+          baseStyles +
+          `
           body {
             background: #1e1e1e;
             color: #d4d4d4;
@@ -305,8 +307,9 @@ export class MarkdownConverter extends BaseConverter<MarkdownOptions> {
           a {
             color: #58a6ff;
           }
-        `;
-      
+        `
+        );
+
       case 'minimal':
         return `
           body {
@@ -367,12 +370,11 @@ export class MarkdownConverter extends BaseConverter<MarkdownOptions> {
             text-decoration: underline;
           }
         `;
-      
+
       default:
         return baseStyles;
     }
   }
-
 
   private async generatePdf(page: Page, options: MarkdownOptions): Promise<Buffer> {
     const pdfOptions: any = {
@@ -392,12 +394,13 @@ export class MarkdownConverter extends BaseConverter<MarkdownOptions> {
     // Add header and footer if specified
     if (options.displayHeaderFooter) {
       pdfOptions.displayHeaderFooter = true;
-      
+
       if (options.headerTemplate) {
         pdfOptions.headerTemplate = options.headerTemplate;
       } else {
         // Default header
-        pdfOptions.headerTemplate = '<div style="font-size: 10px; text-align: center; width: 100%;"></div>';
+        pdfOptions.headerTemplate =
+          '<div style="font-size: 10px; text-align: center; width: 100%;"></div>';
       }
 
       if (options.footerTemplate) {
@@ -419,19 +422,19 @@ export class MarkdownConverter extends BaseConverter<MarkdownOptions> {
 
     // Generate PDF
     const pdfBuffer = await page.pdf(pdfOptions);
-    
+
     return pdfBuffer;
   }
 
   private getViewportSize(format: string): { width: number; height: number } {
     // Common paper sizes in pixels at 96 DPI
     const sizes: { [key: string]: { width: number; height: number } } = {
-      'A3': { width: 1123, height: 1587 },
-      'A4': { width: 794, height: 1123 },
-      'A5': { width: 559, height: 794 },
-      'Letter': { width: 816, height: 1056 },
-      'Legal': { width: 816, height: 1344 },
-      'Tabloid': { width: 1056, height: 1632 },
+      A3: { width: 1123, height: 1587 },
+      A4: { width: 794, height: 1123 },
+      A5: { width: 559, height: 794 },
+      Letter: { width: 816, height: 1056 },
+      Legal: { width: 816, height: 1344 },
+      Tabloid: { width: 1056, height: 1632 },
     };
 
     return sizes[format] || { width: 794, height: 1123 }; // Default to A4

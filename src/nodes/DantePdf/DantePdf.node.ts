@@ -49,42 +49,42 @@ export class DantePdf implements INodeType {
 
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
     const returnData: INodeExecutionData[] = [];
-    
+
     // Check if this is a PDF merge operation
     const firstConversionType = this.getNodeParameter('conversionType', 0) as ConversionType;
-    
+
     if (firstConversionType === 'mergePdfs') {
       // Handle PDF merge specially - collect PDFs using configured sources
       try {
         const mergeOptions = this.getNodeParameter('mergeOptions', 0, {}) as MergeOptions;
         const additionalOptions = this.getNodeParameter('additionalOptions', 0, {}) as any;
-        
+
         // Get PDF sources configuration
         const pdfSourcesParam = this.getNodeParameter('pdfSources', 0, {}) as {
           sources?: PdfSource[];
         };
         const sourcesConfig = pdfSourcesParam.sources || [];
-        
+
         // Resolve all PDF inputs using the configured sources
         const { paths: allPdfs, cleanup } = await resolveInputs(this, 0, sourcesConfig);
-        
+
         try {
           if (allPdfs.length < 2) {
             throw new Error(`Need at least 2 PDFs to merge. Found ${allPdfs.length} PDF(s).`);
           }
-          
+
           // Prepare merge input
           const mergeInput = {
             files: allPdfs,
             options: mergeOptions,
           };
-          
+
           // Perform merge
-          const result = await performConversion('mergePdfs', mergeInput, { 
+          const result = await performConversion('mergePdfs', mergeInput, {
             conversionType: 'mergePdfs',
-            mergeOptions 
+            mergeOptions,
           });
-          
+
           // Create output binary data
           const outputPropertyName = additionalOptions.outputPropertyName || 'data';
           const binaryData = {
@@ -95,7 +95,7 @@ export class DantePdf implements INodeType {
               fileExtension: 'pdf',
             },
           };
-          
+
           returnData.push({
             json: {
               success: true,
@@ -124,14 +124,14 @@ export class DantePdf implements INodeType {
           throw error;
         }
       }
-      
+
       return [returnData];
     }
-    
+
     // Handle other conversion types normally (one by one)
     // For non-merge operations, we process the input data
     const items = this.getInputData();
-    
+
     for (let i = 0; i < items.length; i++) {
       try {
         const conversionType = this.getNodeParameter('conversionType', i) as ConversionType;

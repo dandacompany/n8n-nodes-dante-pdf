@@ -6,7 +6,7 @@ A powerful n8n custom node for PDF conversion with support for multiple formats.
 
 - **Multiple Format Support**: Convert various formats to PDF
   - 📝 **Markdown to PDF** - With theme support and Korean/CJK language support
-  - 🌐 **HTML to PDF** - Full browser rendering with Playwright
+  - 🌐 **HTML to PDF** - Full browser rendering with Chrome/Chromium
   - 📄 **Text to PDF** - Simple text conversion with formatting options
   - 📑 **DOCX to PDF** - Microsoft Word document conversion
   - 🖼️ **Image to PDF** - Convert images with layout options
@@ -17,37 +17,241 @@ A powerful n8n custom node for PDF conversion with support for multiple formats.
   - 🎨 **Theme Support** - Multiple themes for Markdown (GitHub, Dark, Minimal)
   - 📊 **Custom Styling** - CSS customization for HTML/Markdown
   - 📄 **Page Options** - Headers, footers, page numbers
-  - ⚡ **High Performance** - Optimized with Playwright for quality and speed
-  - 🔒 **No System Dependencies** - Automatic browser management
+  - ⚡ **High Performance** - Optimized with Chrome/Chromium for quality and speed
+  - 🔒 **System Chrome Priority** - Uses system Chrome/Chromium for better performance
 
 ## 📦 Installation
 
-### In n8n (Recommended)
+### 🐳 Docker Installation (Recommended for Production)
 
-1. Go to **Settings** > **Community Nodes**
-2. Search for `n8n-nodes-dante-pdf`
-3. Click **Install**
+#### Quick Start with Docker Compose
 
-### Manual Installation
+1. Create a `docker-compose.yml` file:
 
-```bash
-# Navigate to your n8n custom nodes folder
-cd ~/.n8n/custom
+```yaml
+version: '3.8'
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    ports:
+      - 5678:5678
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=password
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./custom-nodes:/home/node/.n8n/custom
+    command: >
+      sh -c "
+        apk add --no-cache chromium chromium-chromedriver ttf-liberation fontconfig &&
+        npm install n8n-nodes-dante-pdf &&
+        n8n start
+      "
 
-# Clone the repository
-git clone https://github.com/dante-pdf/n8n-nodes-dante-pdf.git
-
-# Install dependencies
-cd n8n-nodes-dante-pdf
-npm install
-
-# Build the node
-npm run build
-
-# Restart n8n
+volumes:
+  n8n_data:
 ```
 
-### Development Installation
+2. Start the container:
+
+```bash
+docker-compose up -d
+```
+
+3. Access n8n at `http://localhost:5678`
+
+#### Using Dockerfile (Custom Image)
+
+Create a `Dockerfile`:
+
+```dockerfile
+FROM docker.n8n.io/n8nio/n8n:latest
+USER root
+# Install Chromium for web automation
+RUN apk add --no-cache chromium chromium-chromedriver
+# Install Firefox and all required dependencies for PDF generation
+RUN apk add --no-cache \
+    firefox \
+    firefox-esr \
+    ttf-liberation \
+    fontconfig \
+    gcompat \
+    libstdc++ \
+    dbus \
+    dbus-x11 \
+    mesa-gl \
+    mesa-dri-gallium \
+    udev \
+    xvfb
+# Install Playwright globally
+RUN npm install -g playwright-core
+# Create symbolic links for Playwright to find browsers
+RUN ln -sf /usr/bin/firefox /usr/bin/firefox-stable && \
+    ln -sf /usr/bin/chromium-browser /usr/bin/chromium
+# Set environment variables
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV PLAYWRIGHT_BROWSERS_PATH=/usr/bin
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PLAYWRIGHT_FIREFOX_EXECUTABLE_PATH=/usr/bin/firefox
+
+USER node
+
+# Install the PDF node
+RUN npm install n8n-nodes-dante-pdf
+
+# The package will automatically use system Chromium
+```
+
+Build and run:
+
+```bash
+docker build -t n8n-with-pdf .
+docker run -d -p 5678:5678 -v n8n_data:/home/node/.n8n n8n-with-pdf
+```
+
+### 💻 Windows Installation
+
+#### Prerequisites for Windows
+
+1. **Install Node.js** (18+ recommended):
+   - Download from [nodejs.org](https://nodejs.org/)
+   - Choose the LTS version
+
+2. **Install Chrome or Chromium**:
+   - **Option A - Google Chrome** (Recommended):
+     ```
+     Download from: https://www.google.com/chrome/
+     ```
+   
+   - **Option B - Chromium**:
+     ```
+     Download from: https://www.chromium.org/getting-involved/download-chromium/
+     ```
+
+3. **Install n8n globally**:
+   ```powershell
+   npm install -g n8n
+   ```
+
+4. **Install the PDF node**:
+   ```powershell
+   cd %USERPROFILE%\.n8n\custom
+   npm install n8n-nodes-dante-pdf
+   ```
+
+5. **Verify Chrome is detected**:
+   ```powershell
+   # The package will automatically find Chrome at:
+   # C:\Program Files\Google\Chrome\Application\chrome.exe
+   # or
+   # C:\Program Files (x86)\Google\Chrome\Application\chrome.exe
+   ```
+
+6. **Start n8n**:
+   ```powershell
+   n8n start
+   ```
+
+#### Troubleshooting Windows
+
+If Chrome is not detected:
+
+```powershell
+# Set Chrome path explicitly (if needed)
+set CHROME_PATH="C:\Program Files\Google\Chrome\Application\chrome.exe"
+
+# Or install Playwright Chrome as fallback
+cd %USERPROFILE%\.n8n\custom\node_modules\n8n-nodes-dante-pdf
+npx playwright install chromium
+```
+
+### 🍎 macOS Installation
+
+#### Prerequisites for macOS
+
+1. **Install Node.js** (18+ recommended):
+   ```bash
+   # Using Homebrew
+   brew install node
+   
+   # Or download from nodejs.org
+   ```
+
+2. **Install Chrome or Chromium**:
+   - **Option A - Google Chrome** (Recommended):
+     ```bash
+     # Download from website
+     open https://www.google.com/chrome/
+     
+     # Or using Homebrew
+     brew install --cask google-chrome
+     ```
+   
+   - **Option B - Chromium**:
+     ```bash
+     brew install --cask chromium
+     ```
+
+3. **Install n8n globally**:
+   ```bash
+   npm install -g n8n
+   ```
+
+4. **Install the PDF node**:
+   ```bash
+   cd ~/.n8n/custom
+   npm install n8n-nodes-dante-pdf
+   ```
+
+5. **Verify Chrome is detected**:
+   ```bash
+   # The package will automatically find Chrome at:
+   # /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+   # or
+   # /Applications/Chromium.app/Contents/MacOS/Chromium
+   ```
+
+6. **Start n8n**:
+   ```bash
+   n8n start
+   ```
+
+#### Troubleshooting macOS
+
+If Chrome is not detected:
+
+```bash
+# Check if Chrome is installed
+ls -la "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+
+# Install Playwright Chrome as fallback (if needed)
+cd ~/.n8n/custom/node_modules/n8n-nodes-dante-pdf
+npx playwright install chromium
+```
+
+### 🐧 Linux Installation (Ubuntu/Debian)
+
+```bash
+# Install Chrome
+wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+sudo apt-get update
+sudo apt-get install google-chrome-stable
+
+# Or install Chromium
+sudo apt-get install chromium-browser
+
+# Install n8n and the PDF node
+npm install -g n8n
+cd ~/.n8n/custom
+npm install n8n-nodes-dante-pdf
+
+# Start n8n
+n8n start
+```
+
+### Manual Installation (Development)
 
 ```bash
 # Clone the repository
@@ -63,6 +267,35 @@ npm run link
 
 # Start n8n
 n8n start
+```
+
+## 🚀 Browser Configuration
+
+### Priority Order
+
+The package searches for browsers in this order:
+
+1. **System Chrome/Chromium** (Recommended)
+   - Windows: `C:\Program Files\Google\Chrome\Application\chrome.exe`
+   - macOS: `/Applications/Google Chrome.app`
+   - Linux: `/usr/bin/chromium` or `/usr/bin/google-chrome`
+
+2. **Playwright Chrome** (Fallback - not available on Alpine Linux)
+   - Automatically downloaded if system Chrome not found
+   - Not compatible with Alpine Linux (musl libc)
+
+### Verify Installation
+
+After installation, verify the browser setup:
+
+```javascript
+// In n8n, create a test workflow with DantePDF node
+{
+  "operation": "convertToPdf",
+  "conversionType": "textToPdf",
+  "inputType": "text",
+  "textContent": "Test PDF Generation"
+}
 ```
 
 ## 🚀 Usage
@@ -203,6 +436,26 @@ node test/test-html-converter.js
 node test/test-korean-converter.js
 ```
 
+## 🐛 Troubleshooting
+
+### Common Issues
+
+#### Browser Not Found
+- **Windows**: Ensure Chrome is installed in the default location or set `CHROME_PATH` environment variable
+- **macOS**: Check if Chrome.app exists in Applications folder
+- **Linux**: Install chromium-browser package
+- **Docker**: Ensure Chromium is installed in the container
+
+#### Alpine Linux / Docker Issues
+- Must use system Chromium (Playwright browsers don't work with musl libc)
+- Install required packages: `apk add chromium chromium-chromedriver ttf-liberation fontconfig`
+
+#### Font Issues
+- Install additional fonts for better rendering
+- Docker: `apk add font-noto font-noto-cjk`
+- Ubuntu: `apt-get install fonts-noto fonts-noto-cjk`
+- macOS: Fonts are usually pre-installed
+
 ## 📝 License
 
 MIT
@@ -221,6 +474,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 - Large files (>50MB) may cause memory issues
 - Some complex CSS animations may not render in HTML to PDF
+- Alpine Linux requires system Chromium (Playwright incompatible)
 
 ## 📮 Support
 

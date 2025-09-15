@@ -26,16 +26,16 @@ export class HtmlConverter extends BaseConverter<HtmlOptions> {
 
   async convert(input: ConversionInput<HtmlOptions>): Promise<Buffer> {
     let page: Page | null = null;
-    
+
     try {
       const options = input.options || {};
-      
+
       // Launch browser if not already launched
       if (!this.browser) {
         const browserResult = await BrowserSetup.createOptimizedBrowser({
           headless: true,
           timeout: 30000,
-          useSystemChrome: true
+          useSystemChrome: true,
         });
         this.browser = browserResult.browser;
       }
@@ -76,7 +76,6 @@ export class HtmlConverter extends BaseConverter<HtmlOptions> {
     }
   }
 
-
   private async loadUrl(page: Page, url: string, options: HtmlOptions): Promise<void> {
     const navigationOptions: any = {
       waitUntil: options.waitUntil || 'networkidle',
@@ -112,10 +111,11 @@ export class HtmlConverter extends BaseConverter<HtmlOptions> {
 
   private async loadHtml(page: Page, html: string, options: HtmlOptions): Promise<void> {
     // Set content
-    const waitUntilOption = options.waitUntil === 'networkidle0' || options.waitUntil === 'networkidle2' 
-      ? 'networkidle' 
-      : (options.waitUntil || 'networkidle');
-    
+    const waitUntilOption =
+      options.waitUntil === 'networkidle0' || options.waitUntil === 'networkidle2'
+        ? 'networkidle'
+        : options.waitUntil || 'networkidle';
+
     await page.setContent(html, {
       waitUntil: waitUntilOption as 'load' | 'domcontentloaded' | 'networkidle' | 'commit',
       timeout: 30000,
@@ -156,12 +156,13 @@ export class HtmlConverter extends BaseConverter<HtmlOptions> {
     // Add header and footer if specified
     if (options.displayHeaderFooter) {
       pdfOptions.displayHeaderFooter = true;
-      
+
       if (options.headerTemplate) {
         pdfOptions.headerTemplate = options.headerTemplate;
       } else {
         // Default header
-        pdfOptions.headerTemplate = '<div style="font-size: 10px; text-align: center; width: 100%;"></div>';
+        pdfOptions.headerTemplate =
+          '<div style="font-size: 10px; text-align: center; width: 100%;"></div>';
       }
 
       if (options.footerTemplate) {
@@ -183,19 +184,19 @@ export class HtmlConverter extends BaseConverter<HtmlOptions> {
 
     // Generate PDF
     const pdfBuffer = await page.pdf(pdfOptions);
-    
+
     return pdfBuffer;
   }
 
   private getViewportSize(format: string): { width: number; height: number } {
     // Common paper sizes in pixels at 96 DPI
     const sizes: { [key: string]: { width: number; height: number } } = {
-      'A3': { width: 1123, height: 1587 },
-      'A4': { width: 794, height: 1123 },
-      'A5': { width: 559, height: 794 },
-      'Letter': { width: 816, height: 1056 },
-      'Legal': { width: 816, height: 1344 },
-      'Tabloid': { width: 1056, height: 1632 },
+      A3: { width: 1123, height: 1587 },
+      A4: { width: 794, height: 1123 },
+      A5: { width: 559, height: 794 },
+      Letter: { width: 816, height: 1056 },
+      Legal: { width: 816, height: 1344 },
+      Tabloid: { width: 1056, height: 1632 },
     };
 
     return sizes[format] || { width: 794, height: 1123 }; // Default to A4
