@@ -45,12 +45,10 @@ export class BrowserSetup {
 
     const systemInfo = await SystemDependencyInstaller.detectSystem();
     
-    // For Alpine Linux, try Playwright first (as it now installs with deps)
-    // Only fallback to system Chromium if Playwright fails
+    // For Alpine Linux, MUST use system Chromium - Playwright browsers are incompatible with musl
     if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
-      this.logger.info('Alpine/musl detected, will try Playwright browser first...');
-      // Don't force system chrome anymore since playwright install --with-deps handles it
-      // options.useSystemChrome = true;
+      this.logger.info('Alpine/musl detected - using system Chromium only (Playwright incompatible with musl)');
+      options.useSystemChrome = true;
     }
     
     this.browserPath = await this.findOptimalBrowserPath(systemInfo, options);
@@ -100,24 +98,32 @@ export class BrowserSetup {
       }
     }
 
-    // Try Playwright's bundled browser first (now works on Alpine with --with-deps)
-    try {
-      const playwrightPath = chromium.executablePath();
-      if (playwrightPath && fs.existsSync(playwrightPath)) {
-        this.logger.success(`Using Playwright browser: ${playwrightPath}`);
-        return playwrightPath;
-      }
-    } catch (error) {
-      this.logger.warn(`Playwright browser not found: ${(error as Error).message}`);
-    }
-
-    // Check system browsers as fallback
-    if (options.useSystemChrome) {
+    // For Alpine/musl, ONLY use system browsers
+    if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl' || options.useSystemChrome) {
+      this.logger.info('Checking for system Chromium (required for Alpine/musl)...');
       for (const browserPath of candidatePaths) {
         if (fs.existsSync(browserPath)) {
           this.logger.success(`Found system browser: ${browserPath}`);
           return browserPath;
         }
+      }
+      
+      // If no system browser found on Alpine, provide clear error
+      if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
+        throw new Error('Alpine Linux requires system Chromium. Please install with: apk add chromium chromium-chromedriver');
+      }
+    }
+
+    // For non-Alpine systems, try Playwright's bundled browser
+    if (systemInfo.distro !== 'alpine' && systemInfo.libc !== 'musl') {
+      try {
+        const playwrightPath = chromium.executablePath();
+        if (playwrightPath && fs.existsSync(playwrightPath)) {
+          this.logger.success(`Using Playwright browser: ${playwrightPath}`);
+          return playwrightPath;
+        }
+      } catch (error) {
+        this.logger.warn(`Playwright browser not found: ${(error as Error).message}`);
       }
     }
 
@@ -131,10 +137,10 @@ export class BrowserSetup {
 
     // Provide helpful error message
     if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
-      throw new Error('No browser found. Try: 1) Reinstall the package to trigger browser installation, or 2) Run: npx playwright-core install chromium --with-deps');
+      throw new Error('Alpine Linux requires system Chromium. Please install with: apk add chromium chromium-chromedriver');
     }
 
-    throw new Error('No suitable browser found. Please run: npx playwright-core install chromium --with-deps');
+    throw new Error('No suitable browser found. Please install Chrome, Chromium, or run: npx playwright-core install chromium');
   }
 
   static async createOptimizedBrowser(options: BrowserSetupOptions = {}): Promise<BrowserLaunchResult> {
