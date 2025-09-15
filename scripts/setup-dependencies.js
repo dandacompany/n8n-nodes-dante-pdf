@@ -17,6 +17,54 @@ async function setupDependencies() {
     
     console.log('🚀 [DantePDF] Setting up system dependencies for n8n-nodes-dante-pdf...');
     
+    // Quick Alpine detection and Chromium installation - PRIORITY
+    try {
+      const fs = require('fs');
+      const { execSync } = require('child_process');
+      
+      // Check if we're on Alpine Linux
+      if (fs.existsSync('/etc/alpine-release')) {
+        console.log('🏔️  [DantePDF] Alpine Linux detected!');
+        
+        // Check if Chromium is already installed
+        try {
+          execSync('which chromium-browser || which chromium', { stdio: 'pipe' });
+          console.log('✅ [DantePDF] Chromium already installed');
+        } catch (e) {
+          // Chromium not found, try to install it
+          console.log('📦 [DantePDF] Installing Chromium for Alpine Linux...');
+          console.log('    Running: apk add --no-cache chromium chromium-chromedriver');
+          
+          try {
+            execSync('apk add --no-cache chromium chromium-chromedriver', { 
+              stdio: 'inherit',
+              timeout: 180000 
+            });
+            console.log('✅ [DantePDF] Chromium installed successfully!');
+          } catch (installError) {
+            console.error('❌ [DantePDF] Failed to auto-install Chromium');
+            console.error('');
+            console.error('================================================================================');
+            console.error('⚠️  IMPORTANT: Manual Chromium installation required for Alpine Linux');
+            console.error('================================================================================');
+            console.error('');
+            console.error('Please run this command in your container:');
+            console.error('');
+            console.error('    apk add --no-cache chromium chromium-chromedriver');
+            console.error('');
+            console.error('Or add to your Dockerfile:');
+            console.error('    RUN apk add --no-cache chromium chromium-chromedriver');
+            console.error('');
+            console.error('================================================================================');
+            console.error('');
+            // Don't return here, continue with other setup
+          }
+        }
+      }
+    } catch (error) {
+      console.log('📋 [DantePDF] Platform detection:', error.message);
+    }
+    
     let SystemDependencyInstaller;
     let BrowserSetup;
 
@@ -65,56 +113,7 @@ async function setupDependencies() {
       console.log('🐧 [DantePDF] WSL (Windows Subsystem for Linux) detected');
     }
 
-    // Special handling for Alpine Linux - CRITICAL for n8n Docker environments
-    if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
-      console.log('🏔️  [DantePDF] Alpine Linux detected - Installing Chromium automatically...');
-      
-      try {
-        // Check if we have permission to install packages
-        const { execSync } = require('child_process');
-        
-        // Check if Chromium is already installed
-        try {
-          execSync('which chromium-browser || which chromium', { stdio: 'pipe' });
-          console.log('✅ [DantePDF] Chromium already installed');
-        } catch (checkError) {
-          // Chromium not found, try to install it
-          console.log('📦 [DantePDF] Installing Chromium for Alpine Linux...');
-          
-          try {
-            // Try to install Chromium
-            execSync('apk add --no-cache chromium chromium-chromedriver 2>/dev/null', { 
-              stdio: 'pipe',
-              timeout: 120000 
-            });
-            console.log('✅ [DantePDF] Chromium installed successfully!');
-          } catch (installError) {
-            // If installation fails (likely due to permissions), provide clear instructions
-            console.log('⚠️  [DantePDF] Cannot auto-install Chromium (permission denied)');
-            console.log('');
-            console.log('================================================================================');
-            console.log('📌 [DantePDF] IMPORTANT: Manual Chromium installation required for Alpine Linux');
-            console.log('================================================================================');
-            console.log('');
-            console.log('Please run ONE of the following commands:');
-            console.log('');
-            console.log('Option 1: If you have access to the container:');
-            console.log('    docker exec -it <container-name> apk add --no-cache chromium chromium-chromedriver');
-            console.log('');
-            console.log('Option 2: In your Dockerfile:');
-            console.log('    RUN apk add --no-cache chromium chromium-chromedriver');
-            console.log('');
-            console.log('Option 3: In your docker-compose.yml:');
-            console.log('    command: sh -c "apk add --no-cache chromium chromium-chromedriver && n8n start"');
-            console.log('');
-            console.log('================================================================================');
-            console.log('');
-          }
-        }
-      } catch (error) {
-        console.warn('⚠️  [DantePDF] Could not check/install Chromium:', error.message);
-      }
-    }
+    // Additional system info logging (Alpine already handled above)
 
     // Install system dependencies
     console.log('📦 [DantePDF] Installing system dependencies...');
