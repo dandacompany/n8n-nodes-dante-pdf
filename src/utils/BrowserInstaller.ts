@@ -136,19 +136,46 @@ export class BrowserInstaller {
       
       console.log('DantePDF: Chromium installed successfully');
 
-      // Try to install system dependencies (may require sudo)
+      // Try to install system dependencies with multiple approaches
       try {
         console.log('DantePDF: Installing system dependencies...');
-        execSync('npx playwright-core install-deps chromium', {
-          stdio: 'inherit',
-          env,
-          timeout: 180000, // 3 minutes timeout
-        });
-        console.log('DantePDF: System dependencies installed successfully');
+        
+        // First try with playwright
+        try {
+          execSync('npx playwright-core install-deps chromium', {
+            stdio: 'inherit',
+            env,
+            timeout: 180000, // 3 minutes timeout
+          });
+          console.log('DantePDF: System dependencies installed successfully via playwright');
+        } catch (playwrightError) {
+          console.warn('DantePDF: Playwright install-deps failed, trying manual installation...');
+          
+          // Try manual installation of common dependencies
+          try {
+            // Try apt-get for Debian/Ubuntu systems
+            execSync('apt-get update && apt-get install -y libnss3 libatk-bridge2.0-0 libdrm2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libgtk-3-0 libglib2.0-0 libasound2', {
+              stdio: 'inherit',
+              timeout: 300000, // 5 minutes timeout
+            });
+            console.log('DantePDF: System dependencies installed via apt-get');
+          } catch (aptError) {
+            // Try apk for Alpine systems
+            try {
+              execSync('apk add --no-cache nss atk-bridge gtk+3.0 glib alsa-lib', {
+                stdio: 'inherit',
+                timeout: 180000,
+              });
+              console.log('DantePDF: System dependencies installed via apk');
+            } catch (apkError) {
+              console.warn('DantePDF: Could not install system dependencies automatically');
+              console.warn('DantePDF: Manual installation may be required');
+            }
+          }
+        }
       } catch (error) {
-        // System dependencies might require sudo, so we'll just warn
-        console.warn('DantePDF: Could not install system dependencies. Some features might not work.');
-        console.warn('DantePDF: You may need to run: npx playwright-core install-deps chromium');
+        console.warn('DantePDF: System dependency installation failed');
+        console.warn('DantePDF: This may cause browser launch issues');
         console.warn(`DantePDF: Error details: ${(error as Error).message}`);
       }
 
