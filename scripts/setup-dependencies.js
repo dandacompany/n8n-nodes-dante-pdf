@@ -17,53 +17,7 @@ async function setupDependencies() {
     
     console.log('🚀 [DantePDF] Setting up system dependencies for n8n-nodes-dante-pdf...');
     
-    // Quick Alpine detection and Chromium installation - PRIORITY
-    try {
-      const fs = require('fs');
-      const { execSync } = require('child_process');
-      
-      // Check if we're on Alpine Linux
-      if (fs.existsSync('/etc/alpine-release')) {
-        console.log('🏔️  [DantePDF] Alpine Linux detected!');
-        
-        // Check if Chromium is already installed
-        try {
-          execSync('which chromium-browser || which chromium', { stdio: 'pipe' });
-          console.log('✅ [DantePDF] Chromium already installed');
-        } catch (e) {
-          // Chromium not found, try to install it
-          console.log('📦 [DantePDF] Installing Chromium for Alpine Linux...');
-          console.log('    Running: apk add --no-cache chromium chromium-chromedriver');
-          
-          try {
-            execSync('apk add --no-cache chromium chromium-chromedriver', { 
-              stdio: 'inherit',
-              timeout: 180000 
-            });
-            console.log('✅ [DantePDF] Chromium installed successfully!');
-          } catch (installError) {
-            console.error('❌ [DantePDF] Failed to auto-install Chromium');
-            console.error('');
-            console.error('================================================================================');
-            console.error('⚠️  IMPORTANT: Manual Chromium installation required for Alpine Linux');
-            console.error('================================================================================');
-            console.error('');
-            console.error('Please run this command in your container:');
-            console.error('');
-            console.error('    apk add --no-cache chromium chromium-chromedriver');
-            console.error('');
-            console.error('Or add to your Dockerfile:');
-            console.error('    RUN apk add --no-cache chromium chromium-chromedriver');
-            console.error('');
-            console.error('================================================================================');
-            console.error('');
-            // Don't return here, continue with other setup
-          }
-        }
-      }
-    } catch (error) {
-      console.log('📋 [DantePDF] Platform detection:', error.message);
-    }
+    // Playwright browser will be downloaded by postinstall npm script
     
     let SystemDependencyInstaller;
     let BrowserSetup;

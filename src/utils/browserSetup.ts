@@ -4,6 +4,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
+// Set Playwright browsers path to n8n user directory
+if (!process.env.PLAYWRIGHT_BROWSERS_PATH) {
+  process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(os.homedir(), '.n8n', 'dante-pdf-browsers');
+}
+
 export interface BrowserSetupOptions {
   headless?: boolean;
   timeout?: number;
@@ -45,11 +50,9 @@ export class BrowserSetup {
 
     const systemInfo = await SystemDependencyInstaller.detectSystem();
     
-    // For Alpine Linux, MUST use system Chromium - Playwright browsers are incompatible with musl
-    if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
-      this.logger.info('Alpine/musl detected - using system Chromium only (Playwright incompatible with musl)');
-      options.useSystemChrome = true;
-    }
+    // Try Playwright browser first for all platforms
+    // The postinstall script now downloads compatible browsers
+    this.logger.info(`Checking for Playwright browser in: ${process.env.PLAYWRIGHT_BROWSERS_PATH}`);
     
     this.browserPath = await this.findOptimalBrowserPath(systemInfo, options);
 
@@ -98,32 +101,24 @@ export class BrowserSetup {
       }
     }
 
-    // For Alpine/musl, ONLY use system browsers
-    if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl' || options.useSystemChrome) {
-      this.logger.info('Checking for system Chromium (required for Alpine/musl)...');
+    // Try Playwright's browser first (now installed in user directory)
+    try {
+      const playwrightPath = chromium.executablePath();
+      if (playwrightPath && fs.existsSync(playwrightPath)) {
+        this.logger.success(`Using Playwright browser: ${playwrightPath}`);
+        return playwrightPath;
+      }
+    } catch (error) {
+      this.logger.warn(`Playwright browser not found: ${(error as Error).message}`);
+    }
+
+    // If useSystemChrome is set or Playwright not found, try system browsers
+    if (options.useSystemChrome) {
       for (const browserPath of candidatePaths) {
         if (fs.existsSync(browserPath)) {
           this.logger.success(`Found system browser: ${browserPath}`);
           return browserPath;
         }
-      }
-      
-      // If no system browser found on Alpine, provide clear error
-      if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
-        throw new Error('Alpine Linux requires system Chromium. Please install with: apk add chromium chromium-chromedriver');
-      }
-    }
-
-    // For non-Alpine systems, try Playwright's bundled browser
-    if (systemInfo.distro !== 'alpine' && systemInfo.libc !== 'musl') {
-      try {
-        const playwrightPath = chromium.executablePath();
-        if (playwrightPath && fs.existsSync(playwrightPath)) {
-          this.logger.success(`Using Playwright browser: ${playwrightPath}`);
-          return playwrightPath;
-        }
-      } catch (error) {
-        this.logger.warn(`Playwright browser not found: ${(error as Error).message}`);
       }
     }
 
@@ -136,11 +131,7 @@ export class BrowserSetup {
     }
 
     // Provide helpful error message
-    if (systemInfo.distro === 'alpine' || systemInfo.libc === 'musl') {
-      throw new Error('Alpine Linux requires system Chromium. Please install with: apk add chromium chromium-chromedriver');
-    }
-
-    throw new Error('No suitable browser found. Please install Chrome, Chromium, or run: npx playwright-core install chromium');
+    throw new Error(`No browser found. Please run: PLAYWRIGHT_BROWSERS_PATH=${os.homedir()}/.n8n/dante-pdf-browsers npx playwright-core install chromium`);
   }
 
   static async createOptimizedBrowser(options: BrowserSetupOptions = {}): Promise<BrowserLaunchResult> {
