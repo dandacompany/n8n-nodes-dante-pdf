@@ -15,8 +15,7 @@ export class HtmlConverter extends BaseConverter<HtmlOptions> {
 
   override async initialize(): Promise<void> {
     this.logger.info('HtmlConverter initialized (Playwright-based)');
-    // Ensure browser is installed
-    await this.browserInstaller.ensureBrowserInstalled();
+    // Browser installation will be handled during actual conversion
   }
 
   override async cleanup(): Promise<void> {
@@ -102,20 +101,19 @@ export class HtmlConverter extends BaseConverter<HtmlOptions> {
       launchOptions.ignoreHTTPSErrors = true;
     }
 
+    // First, ensure browser is installed before attempting to launch
+    try {
+      await this.browserInstaller.ensureBrowserInstalled();
+    } catch (installError) {
+      this.logger.warn('Browser installation failed, but proceeding with launch attempt:', installError);
+    }
+
+    // Try to launch browser
     try {
       return await chromium.launch(launchOptions);
     } catch (error) {
-      // If browser launch fails, try to install and retry once
-      this.logger.warn('Browser launch failed, attempting to install browsers...', error);
-      
-      try {
-        await this.browserInstaller.ensureBrowserInstalled();
-        this.logger.info('Browser installation completed, retrying launch...');
-        return await chromium.launch(launchOptions);
-      } catch (installError) {
-        this.logger.error('Failed to install browser:', installError);
-        throw new Error(`Browser launch failed and installation failed: ${(error as Error).message}`);
-      }
+      this.logger.error('Browser launch failed:', error);
+      throw new Error(`Browser launch failed: ${(error as Error).message}. Please ensure Playwright browsers are installed by running: npx playwright-core install chromium`);
     }
   }
 

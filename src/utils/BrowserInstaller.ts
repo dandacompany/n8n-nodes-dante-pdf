@@ -36,11 +36,15 @@ export class BrowserInstaller {
       return this.installPromise;
     }
 
-    // Check if browser is already installed
-    const browserInstalled = await this.checkBrowserInstalled();
-    if (browserInstalled) {
-      console.log('DantePDF: Chromium browser already installed');
-      return;
+    // Quick check if browser is already installed
+    try {
+      const executablePath = chromium.executablePath();
+      if (executablePath && existsSync(executablePath)) {
+        console.log('DantePDF: Chromium browser already installed');
+        return;
+      }
+    } catch (error) {
+      // Ignore check errors, proceed with installation
     }
 
     // Start installation
@@ -148,18 +152,9 @@ export class BrowserInstaller {
         console.warn(`DantePDF: Error details: ${(error as Error).message}`);
       }
 
-      // Final verification - just check if executable exists
-      try {
-        const executablePath = chromium.executablePath();
-        if (!executablePath || !existsSync(executablePath)) {
-          throw new Error(`Browser executable not found after installation: ${executablePath}`);
-        }
-        console.log(`DantePDF: Installation verification passed - executable exists at ${executablePath}`);
-      } catch (verifyError) {
-        console.warn('DantePDF: Post-installation verification failed:', verifyError);
-        // Don't throw error, just warn - let runtime execution handle browser issues
-        console.log('DantePDF: Proceeding despite verification warning - will retry at runtime if needed');
-      }
+      // Skip verification completely - let runtime handle any issues
+      console.log('DantePDF: Installation completed, skipping verification for compatibility');
+      console.log('DantePDF: Browser will be verified during actual PDF generation');
       
     } catch (error) {
       throw new Error(`Failed to install Chromium: ${(error as Error).message}`);
