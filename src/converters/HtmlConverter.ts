@@ -110,13 +110,16 @@ export class HtmlConverter extends BaseConverter<HtmlOptions> {
   }
 
   private async loadHtml(page: Page, html: string, options: HtmlOptions): Promise<void> {
+    // Ensure proper encoding and add Korean font support
+    const enhancedHtml = this.enhanceHtmlWithKoreanSupport(html);
+    
     // Set content
     const waitUntilOption =
       options.waitUntil === 'networkidle0' || options.waitUntil === 'networkidle2'
         ? 'networkidle'
         : options.waitUntil || 'networkidle';
 
-    await page.setContent(html, {
+    await page.setContent(enhancedHtml, {
       waitUntil: waitUntilOption as 'load' | 'domcontentloaded' | 'networkidle' | 'commit',
       timeout: 30000,
     });
@@ -139,6 +142,14 @@ export class HtmlConverter extends BaseConverter<HtmlOptions> {
   }
 
   private async generatePdf(page: Page, options: HtmlOptions): Promise<Buffer> {
+    // Wait for fonts to load
+    await page.evaluate(() => {
+      return document.fonts.ready;
+    });
+
+    // Additional wait for web fonts
+    await page.waitForTimeout(1000);
+
     const pdfOptions: any = {
       format: options.format || 'A4',
       landscape: options.landscape || false,
@@ -200,5 +211,94 @@ export class HtmlConverter extends BaseConverter<HtmlOptions> {
     };
 
     return sizes[format] || { width: 794, height: 1123 }; // Default to A4
+  }
+
+  private enhanceHtmlWithKoreanSupport(html: string): string {
+    // Check if HTML already has proper meta tags and CSS
+    const hasCharset = /<meta[^>]*charset/i.test(html);
+    const hasViewport = /<meta[^>]*viewport/i.test(html);
+    const hasHtmlTag = /<html/i.test(html);
+    const hasHeadTag = /<head/i.test(html);
+    const hasBodyTag = /<body/i.test(html);
+
+    // Korean font CSS
+    const koreanFontStyle = `
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+        
+        * {
+          font-family: 'Noto Sans KR', 'Malgun Gothic', '맑은 고딕', 'Apple SD Gothic Neo', 
+                       'Helvetica Neue', Arial, sans-serif !important;
+        }
+        
+        body {
+          font-family: 'Noto Sans KR', 'Malgun Gothic', '맑은 고딕', 'Apple SD Gothic Neo', 
+                       'Helvetica Neue', Arial, sans-serif !important;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+          text-rendering: optimizeLegibility;
+        }
+        
+        pre, code {
+          font-family: 'Noto Sans Mono CJK KR', 'D2Coding', Consolas, Monaco, monospace !important;
+        }
+      </style>
+    `;
+
+    // Build enhanced HTML
+    let enhancedHtml = html;
+
+    if (!hasHtmlTag) {
+      // Wrap content in proper HTML structure
+      enhancedHtml = `
+        <!DOCTYPE html>
+        <html lang="ko">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          ${koreanFontStyle}
+        </head>
+        <body>
+          ${html}
+        </body>
+        </html>
+      `;
+    } else {
+      // Add meta tags and styles to existing HTML
+      if (!hasCharset) {
+        enhancedHtml = enhancedHtml.replace(
+          /<head[^>]*>/i,
+          '$&\n<meta charset="UTF-8">'
+        );
+      }
+
+      if (!hasViewport) {
+        enhancedHtml = enhancedHtml.replace(
+          /<head[^>]*>/i,
+          '$&\n<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+        );
+      }
+
+      // Add Korean font styles
+      if (hasHeadTag) {
+        enhancedHtml = enhancedHtml.replace(
+          /<\/head>/i,
+          `${koreanFontStyle}\n</head>`
+        );
+      } else {
+        enhancedHtml = enhancedHtml.replace(
+          /<html[^>]*>/i,
+          `$&\n<head>${koreanFontStyle}</head>`
+        );
+      }
+
+      // Set lang attribute if not present
+      enhancedHtml = enhancedHtml.replace(
+        /<html(?![^>]*lang)/i,
+        '<html lang="ko"'
+      );
+    }
+
+    return enhancedHtml;
   }
 }
