@@ -2,16 +2,14 @@ import { marked } from 'marked';
 import { BaseConverter } from './BaseConverter';
 import { ConversionInput, MarkdownOptions } from '../types';
 import { createError } from '../utils/errors';
-import { BrowserInstaller } from '../utils/BrowserInstaller';
-import { chromium, Browser, Page } from 'playwright-core';
+import { BrowserSetup } from '../utils/browserSetup';
+import { Browser, Page } from 'playwright-core';
 
 export class MarkdownConverter extends BaseConverter<MarkdownOptions> {
-  private browserInstaller: BrowserInstaller;
   private browser: Browser | null = null;
 
   constructor() {
     super('MarkdownConverter', 10 * 1024 * 1024, ['.md', '.markdown']);
-    this.browserInstaller = BrowserInstaller.getInstance();
   }
 
   override async initialize(): Promise<void> {
@@ -51,7 +49,12 @@ export class MarkdownConverter extends BaseConverter<MarkdownOptions> {
 
       // Launch browser if not already launched
       if (!this.browser) {
-        this.browser = await this.launchBrowser(options);
+        const browserResult = await BrowserSetup.createOptimizedBrowser({
+          headless: true,
+          timeout: 30000,
+          useSystemChrome: true
+        });
+        this.browser = browserResult.browser;
       }
 
       // Create a new page
@@ -370,94 +373,6 @@ export class MarkdownConverter extends BaseConverter<MarkdownOptions> {
     }
   }
 
-  private async launchBrowser(options: MarkdownOptions): Promise<Browser> {
-    const launchOptions: any = {
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-features=VizDisplayCompositor',
-        '--disable-web-security',
-        '--disable-features=site-per-process',
-        '--disable-features=TranslateUI',
-        '--disable-ipc-flooding-protection',
-        '--disable-renderer-backgrounding',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-background-networking',
-        '--disable-background-timer-throttling',
-        '--disable-client-side-phishing-detection',
-        '--disable-component-update',
-        '--disable-default-apps',
-        '--disable-domain-reliability',
-        '--disable-features=AudioServiceOutOfProcess',
-        '--disable-hang-monitor',
-        '--disable-notifications',
-        '--disable-offer-store-unmasked-wallet-cards',
-        '--disable-popup-blocking',
-        '--disable-print-preview',
-        '--disable-prompt-on-repost',
-        '--disable-speech-api',
-        '--disable-sync',
-        '--disable-tab-for-desktop-share',
-        '--disable-translate',
-        '--disable-voice-input',
-        '--disable-wake-on-wifi',
-        '--enable-async-dns',
-        '--enable-simple-cache-backend',
-        '--enable-tcp-fast-open',
-        '--disable-accelerated-2d-canvas',
-        '--disable-accelerated-jpeg-decoding',
-        '--disable-accelerated-mjpeg-decode',
-        '--disable-accelerated-video-decode',
-        '--disable-accelerated-video-encode',
-        '--disable-app-list-dismiss-on-blur',
-        '--disable-auto-reload',
-        '--no-pings',
-        '--media-cache-size=33554432',
-        '--aggressive-cache-discard',
-        '--use-simple-cache-backend=on'
-      ],
-    };
-
-    // First, ensure browser is installed before attempting to launch
-    try {
-      await this.browserInstaller.ensureBrowserInstalled();
-    } catch (installError) {
-      this.logger.warn('Browser installation failed, but proceeding with launch attempt:', installError);
-    }
-
-    // Try to launch browser
-    try {
-      return await chromium.launch(launchOptions);
-    } catch (error) {
-      this.logger.error('Browser launch failed:', error);
-      
-      const errorMessage = (error as Error).message;
-      
-      // Check for specific system library errors
-      if (errorMessage.includes('symbol not found') || errorMessage.includes('g_object_notify') || errorMessage.includes('atk_get_version')) {
-        throw new Error(`Browser launch failed due to missing system libraries. Please install required dependencies:
-
-For Ubuntu/Debian:
-sudo apt-get update && sudo apt-get install -y libnss3 libatk-bridge2.0-0 libdrm2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libgtk-3-0 libglib2.0-0 libasound2
-
-For Alpine:
-apk add --no-cache nss atk-bridge gtk+3.0 glib alsa-lib
-
-For other systems:
-npx playwright-core install-deps chromium
-
-Original error: ${errorMessage}`);
-      }
-      
-      throw new Error(`Browser launch failed: ${errorMessage}. Please ensure Playwright browsers and system dependencies are installed.`);
-    }
-  }
 
   private async generatePdf(page: Page, options: MarkdownOptions): Promise<Buffer> {
     const pdfOptions: any = {
