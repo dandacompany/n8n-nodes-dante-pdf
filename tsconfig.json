@@ -31,16 +31,9 @@
     "emitDecoratorMetadata": true,
     "removeComments": false,
     "preserveConstEnums": true,
-    "incremental": true,
+    "incremental": false,
     "isolatedModules": true,
-    "baseUrl": "./src",
-    "paths": {
-      "@/*": ["./*"],
-      "@/nodes/*": ["./nodes/*"],
-      "@/converters/*": ["./converters/*"],
-      "@/utils/*": ["./utils/*"],
-      "@/credentials/*": ["./credentials/*"]
-    }
+    "baseUrl": "./src"
   },
   "include": [
     "src/**/*"
