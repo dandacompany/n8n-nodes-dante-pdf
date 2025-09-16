@@ -479,8 +479,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 📮 Support
 
 - 📧 Email: datapod.k@gmail.com
-- 🐛 Issues: [GitHub Issues](https://github.com/dante-pdf/n8n-nodes-dante-pdf/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/dante-pdf/n8n-nodes-dante-pdf/discussions)
+- 🐛 Issues: [GitHub Issues](https://github.com/dandacompany/n8n-nodes-dante-pdf/issues)
+- 💬 Discussions: [GitHub Discussions](https://github.com/dandacompany/n8n-nodes-dante-pdf/discussions)
 - 📺 YouTube: [Dante Labs](https://youtube.com/@dante-labs)
 - 🎥 Tutorials: Check out our YouTube channel for tutorials and guides
 
